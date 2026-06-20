@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>مولد الأسكي العربي</title>
+    <link rel="stylesheet" href="styles.css?v=20260620k">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="output-panel" aria-label="معاينة فن الأسكي">
+        <header class="topbar">
+          <div class="title-block">
+            <h1>مولد الأسكي العربي</h1>
+            <p>اكتب كلمة عربية، اختر الخط، واصنعها من رموز كود.</p>
+          </div>
+        </header>
+
+        <div class="toolbar">
+          <div class="tab-switch" aria-label="نوع المعاينة">
+            <button class="tab-button is-active" type="button" data-tab="canvas">المعاينة</button>
+            <button class="tab-button" type="button" data-tab="text">النص</button>
+          </div>
+          <div class="export-menu" id="exportMenu">
+            <button class="export-toggle" id="exportToggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportOptions">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 3v12"></path>
+                <path d="m7 10 5 5 5-5"></path>
+                <path d="M5 19h14"></path>
+              </svg>
+              <span>تصدير</span>
+            </button>
+            <div class="export-options" id="exportOptions" role="menu" aria-label="خيارات التصدير">
+              <button id="downloadPng" type="button" role="menuitem">PNG شفاف</button>
+              <button id="downloadTxt" type="button" role="menuitem">TXT</button>
+              <button id="copyText" type="button" role="menuitem">نسخ النص</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview-frame" id="previewFrame">
+          <canvas id="artCanvas" aria-label="معاينة فن الأسكي الناتج"></canvas>
+          <pre id="textOutput" class="is-hidden" dir="ltr" aria-label="النص القابل للنسخ"></pre>
+        </div>
+
+        <footer class="credit-line" dir="ltr">© 2026 Issa Abu Aita · Amman, Jordan</footer>
+      </section>
+
+      <aside class="control-panel" aria-label="إعدادات التوليد">
+        <div class="panel-title">
+          <strong>الإعدادات</strong>
+          <span>فن نصي</span>
+        </div>
+
+        <section class="panel-section">
+          <label class="field">
+            <textarea id="sourceText" dir="rtl" rows="3" spellcheck="false">حب</textarea>
+          </label>
+
+          <label class="field">
+            <span>رموز التعبئة</span>
+            <select id="fillPreset">
+              <option value="01IM:;/\.,{}[]" selected>كود / كلاسيكي</option>
+              <option value="0123456789">أرقام</option>
+              <option value=".-:=+*#%@">درجات كثافة</option>
+              <option value="[]{}()/\&lt;&gt;">هندسي</option>
+              <option value=".,:;">نقاط وفواصل</option>
+              <option value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">حروف لاتينية</option>
+              <option value="custom">أخرى</option>
+            </select>
+          </label>
+
+          <label class="field custom-fill-field" aria-label="رموز تعبئة مخصصة">
+            <input id="fillText" dir="ltr" type="text" value="01IM:;/\.,{}[]" spellcheck="false">
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>الخطوط</h2>
+
+          <div class="choice-grid font-choice-grid" id="fontButtons" aria-label="نوع الخط">
+            <button class="font-button is-active" type="button" data-font="Geeza Pro">نسخ</button>
+            <button class="font-button" type="button" data-font="Aref Ruqaa">رقعة</button>
+            <button class="font-button" type="button" data-font="Noto Sans Arabic">حديث</button>
+          </div>
+
+          <select id="fontSelect" class="is-hidden" aria-hidden="true" tabindex="-1">
+            <option value="Geeza Pro">Geeza Pro</option>
+            <option value="Aref Ruqaa">Aref Ruqaa</option>
+            <option value="Noto Sans Arabic">Noto Sans Arabic</option>
+            <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
+            <option value="Amiri">Amiri</option>
+            <option value="Scheherazade New">Scheherazade New</option>
+            <option value="Dubai">Dubai</option>
+            <option value="Tahoma">Tahoma</option>
+            <option value="Arial">Arial</option>
+          </select>
+
+          <div class="font-tools" aria-label="إدارة الخطوط">
+            <button class="icon-action" id="fontUploadTrigger" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 19V5"></path>
+                <path d="m7 10 5-5 5 5"></path>
+                <path d="M5 19h14"></path>
+              </svg>
+              <span>رفع خط</span>
+            </button>
+            <button class="icon-action" id="scanFonts" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <rect x="4" y="5" width="16" height="11" rx="1.5"></rect>
+                <path d="M8 20h8"></path>
+                <path d="M12 16v4"></path>
+              </svg>
+              <span>من الجهاز</span>
+            </button>
+            <input id="fontUpload" type="file" multiple accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2">
+          </div>
+
+          <div class="font-list" id="fontList">لم يتم اختيار خطوط بعد</div>
+        </section>
+
+        <section class="panel-section">
+          <h2>اللون والسماكة</h2>
+
+          <div class="color-grid">
+            <label class="color-field">
+              <span>لون الرسم</span>
+              <input id="artColor" type="color" value="#111111">
+            </label>
+          </div>
+
+          <div class="choice-grid weight-block" id="weightButtons" aria-label="سماكة الخط">
+            <button class="weight-button is-active" type="button" data-weight="400">عادي</button>
+            <button class="weight-button" type="button" data-weight="600">متوسط</button>
+            <button class="weight-button" type="button" data-weight="800">ثقيل</button>
+          </div>
+
+          <select id="fontWeight" class="is-hidden" aria-hidden="true" tabindex="-1">
+            <option value="400">عادي</option>
+            <option value="600">متوسط</option>
+            <option value="800">ثقيل</option>
+          </select>
+        </section>
+
+        <section class="panel-section">
+          <h2>المقاسات</h2>
+
+          <label class="range-field">
+            <span>حجم الشكل <b id="sizeValue">360</b></span>
+            <input id="sizeRange" type="range" min="160" max="620" value="360" step="10">
+          </label>
+
+          <label class="range-field">
+            <span>دقة الرموز <b id="detailValue">104</b></span>
+            <input id="detailRange" type="range" min="48" max="170" value="104" step="2">
+          </label>
+
+          <label class="range-field">
+            <span>حساسية الحواف <b id="thresholdValue">18</b></span>
+            <input id="thresholdRange" type="range" min="4" max="54" value="18" step="1">
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>الشكل والحركة</h2>
+
+          <div class="mode-block" aria-label="نمط الرموز">
+            <button class="mode-button is-active" type="button" data-mode="code">رموز كود</button>
+            <button class="mode-button" type="button" data-mode="shade">تدرج ASCII</button>
+            <button class="mode-button" type="button" data-mode="solid">كتلة</button>
+          </div>
+
+          <label class="toggle-field">
+            <input id="gridToggle" type="checkbox" checked>
+            <span>إظهار الشبكة في المعاينة</span>
+          </label>
+
+          <label class="field">
+            <span>تكوين الرسم</span>
+            <select id="compositionSelect">
+              <option value="normal">عادي</option>
+              <option value="arc">قوس</option>
+              <option value="circle">دائري</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>الحركة</span>
+            <select id="animationSelect">
+              <option value="none" selected>ثابت</option>
+              <option value="scan">مسح واضح</option>
+              <option value="flicker">وميض رموز</option>
+              <option value="wave">موجة</option>
+              <option value="reveal">ظهور تدريجي</option>
+              <option value="orbit">مدار خفيف</option>
+              <option value="glitch">خلل رقمي</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>التصدير</h2>
+
+          <label class="toggle-field">
+            <input id="exportBackground" type="checkbox">
+            <span>خلفية بيضاء في PNG</span>
+          </label>
+
+          <label class="field">
+            <span>جودة PNG</span>
+            <select id="exportScale">
+              <option value="2">2×</option>
+              <option value="4" selected>4× للطباعة</option>
+              <option value="6">6× كبير</option>
+            </select>
+          </label>
+        </section>
+      </aside>
+    </main>
+
+    <canvas id="maskCanvas" hidden></canvas>
+    <script src="app.js?v=20260620k"></script>
+  </body>
+</html>
