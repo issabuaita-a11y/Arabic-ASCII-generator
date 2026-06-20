@@ -122,7 +122,6 @@ textarea:focus-visible {
 
 .tab-button,
 .export-toggle,
-.font-button,
 .weight-button,
 .mode-button {
   font-size: 13px;
@@ -183,9 +182,7 @@ textarea:focus-visible {
 }
 
 .tab-button.is-active,
-.font-button.is-active,
 .weight-button.is-active,
-.font-pill.is-active,
 .mode-button.is-active {
   color: var(--ui-control-active-text);
   background: var(--ui-control-active);
@@ -244,6 +241,7 @@ textarea:focus-visible {
   color: var(--art-color);
   background: var(--art-bg);
   font-family: "Courier New", monospace;
+  font-weight: 800;
   font-size: 11px;
   line-height: 0.92;
   white-space: pre;
@@ -319,6 +317,51 @@ textarea:focus-visible {
   margin-top: -6px;
 }
 
+.source-mode-grid {
+  margin-bottom: 10px;
+}
+
+.source-mode-button {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.source-mode-button.is-active {
+  color: var(--ui-control-active-text);
+  background: var(--ui-control-active);
+}
+
+.image-source-panel {
+  margin: 0 0 14px;
+}
+
+.image-source-panel input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.source-upload-action {
+  width: 100%;
+}
+
+.source-info {
+  margin-top: 7px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--art-color) 16%, transparent);
+  border-radius: 8px;
+  color: var(--ui-muted);
+  background: var(--ui-surface-strong);
+  direction: ltr;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .field span,
 .range-field span,
 .color-field span,
@@ -378,25 +421,16 @@ input[type="range"] {
   clip: rect(0, 0, 0, 0);
 }
 
-.font-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.font-search-status {
   min-height: 34px;
-  margin: 0 0 14px;
-  padding: 7px;
+  margin: -4px 0 14px;
+  padding: 8px 9px;
   border: 1px solid color-mix(in srgb, var(--art-color) 16%, transparent);
   border-radius: 8px;
   color: var(--ui-muted);
   background: var(--ui-surface-strong);
   font-size: 12px;
-  line-height: 1.5;
-}
-
-.font-pill {
-  min-height: 30px;
-  padding: 5px 8px;
-  font-size: 12px;
+  line-height: 1.4;
 }
 
 .choice-grid,
@@ -431,12 +465,14 @@ input[type="range"] {
   stroke-width: 2;
 }
 
-.font-choice-grid,
 .weight-block {
   margin-bottom: 10px;
 }
 
-.font-button,
+.ink-range-field {
+  margin-bottom: 0;
+}
+
 .weight-button,
 .mode-button {
   padding-inline: 6px;

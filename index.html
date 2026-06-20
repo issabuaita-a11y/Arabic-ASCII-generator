@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>مولد الأسكي العربي</title>
-    <link rel="stylesheet" href="styles.css?v=20260620k">
+    <link rel="stylesheet" href="styles.css?v=20260620q">
   </head>
   <body>
     <main class="app-shell">
@@ -53,9 +53,27 @@
         </div>
 
         <section class="panel-section">
-          <label class="field">
+          <div class="choice-grid source-mode-grid" id="sourceModeButtons" aria-label="مصدر الرسم">
+            <button class="source-mode-button is-active" type="button" data-source-mode="text">نص</button>
+            <button class="source-mode-button" type="button" data-source-mode="image">صورة</button>
+          </div>
+
+          <label class="field text-source-field">
             <textarea id="sourceText" dir="rtl" rows="3" spellcheck="false">حب</textarea>
           </label>
+
+          <div class="image-source-panel is-hidden" id="imageSourcePanel">
+            <button class="icon-action source-upload-action" id="imageUploadTrigger" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 19V5"></path>
+                <path d="m7 10 5-5 5 5"></path>
+                <path d="M5 19h14"></path>
+              </svg>
+              <span>رفع صورة</span>
+            </button>
+            <input id="imageUpload" type="file" accept="image/*">
+            <div class="source-info" id="imageInfo">PNG شفاف أو صورة بخلفية بسيطة</div>
+          </div>
 
           <label class="field">
             <span>رموز التعبئة</span>
@@ -78,23 +96,22 @@
         <section class="panel-section">
           <h2>الخطوط</h2>
 
-          <div class="choice-grid font-choice-grid" id="fontButtons" aria-label="نوع الخط">
-            <button class="font-button is-active" type="button" data-font="Geeza Pro">نسخ</button>
-            <button class="font-button" type="button" data-font="Aref Ruqaa">رقعة</button>
-            <button class="font-button" type="button" data-font="Noto Sans Arabic">حديث</button>
-          </div>
+          <label class="field">
+            <span>اختيار الخط</span>
+            <select id="fontSelect">
+              <option value="Geeza Pro">Geeza Pro</option>
+              <option value="Aref Ruqaa">Aref Ruqaa</option>
+              <option value="Noto Sans Arabic">Noto Sans Arabic</option>
+              <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
+              <option value="Amiri">Amiri</option>
+              <option value="Scheherazade New">Scheherazade New</option>
+              <option value="Dubai">Dubai</option>
+              <option value="Tahoma">Tahoma</option>
+              <option value="Arial">Arial</option>
+            </select>
+          </label>
 
-          <select id="fontSelect" class="is-hidden" aria-hidden="true" tabindex="-1">
-            <option value="Geeza Pro">Geeza Pro</option>
-            <option value="Aref Ruqaa">Aref Ruqaa</option>
-            <option value="Noto Sans Arabic">Noto Sans Arabic</option>
-            <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
-            <option value="Amiri">Amiri</option>
-            <option value="Scheherazade New">Scheherazade New</option>
-            <option value="Dubai">Dubai</option>
-            <option value="Tahoma">Tahoma</option>
-            <option value="Arial">Arial</option>
-          </select>
+          <div class="font-search-status" id="fontSearchStatus" aria-live="polite">9 خطوط متاحة</div>
 
           <div class="font-tools" aria-label="إدارة الخطوط">
             <button class="icon-action" id="fontUploadTrigger" type="button">
@@ -116,7 +133,6 @@
             <input id="fontUpload" type="file" multiple accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2">
           </div>
 
-          <div class="font-list" id="fontList">لم يتم اختيار خطوط بعد</div>
         </section>
 
         <section class="panel-section">
@@ -140,6 +156,11 @@
             <option value="600">متوسط</option>
             <option value="800">ثقيل</option>
           </select>
+
+          <label class="range-field ink-range-field">
+            <span>قوة الحبر <b id="inkValue">3</b></span>
+            <input id="inkRange" type="range" min="1" max="5" value="3" step="1">
+          </label>
         </section>
 
         <section class="panel-section">
@@ -219,6 +240,6 @@
     </main>
 
     <canvas id="maskCanvas" hidden></canvas>
-    <script src="app.js?v=20260620k"></script>
+    <script src="app.js?v=20260620q"></script>
   </body>
 </html>
