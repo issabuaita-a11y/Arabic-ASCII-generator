@@ -8,11 +8,8 @@ const elements = {
   imageInfo: document.querySelector("#imageInfo"),
   fillPreset: document.querySelector("#fillPreset"),
   fillText: document.querySelector("#fillText"),
+  fontSourceButtons: document.querySelector("#fontSourceButtons"),
   fontSelect: document.querySelector("#fontSelect"),
-  fontSearchStatus: document.querySelector("#fontSearchStatus"),
-  scanFonts: document.querySelector("#scanFonts"),
-  fontUploadTrigger: document.querySelector("#fontUploadTrigger"),
-  fontUpload: document.querySelector("#fontUpload"),
   fontWeight: document.querySelector("#fontWeight"),
   compositionSelect: document.querySelector("#compositionSelect"),
   artColor: document.querySelector("#artColor"),
@@ -30,16 +27,14 @@ const elements = {
   inkValue: document.querySelector("#inkValue"),
   modeButtons: Array.from(document.querySelectorAll(".mode-button")),
   tabButtons: Array.from(document.querySelectorAll(".tab-button")),
-  weightButtons: document.querySelector("#weightButtons"),
   artCanvas: document.querySelector("#artCanvas"),
   maskCanvas: document.querySelector("#maskCanvas"),
   previewFrame: document.querySelector("#previewFrame"),
   textOutput: document.querySelector("#textOutput"),
   exportMenu: document.querySelector("#exportMenu"),
   exportToggle: document.querySelector("#exportToggle"),
-  copyText: document.querySelector("#copyText"),
-  downloadTxt: document.querySelector("#downloadTxt"),
   downloadPng: document.querySelector("#downloadPng"),
+  downloadGif: document.querySelector("#downloadGif"),
 };
 
 const state = {
@@ -49,10 +44,14 @@ const state = {
   mode: "code",
   tab: "canvas",
   renderId: 0,
+  imageProcessId: 0,
   animationId: 0,
+  fontSource: "basic",
+  basicFonts: [],
+  localFontsLoaded: false,
   availableFonts: [],
+  fontWeightsByFamily: new Map(),
   currentFontFamily: "",
-  uploadedFonts: [],
   deviceFonts: [],
   lastArt: null,
   lastFamily: "",
@@ -69,6 +68,14 @@ const TEXT_CELL_ASPECT = 1.7;
 const SHADE_RAMP = " .,:;irsXA253hMHGS#9B&@";
 const PREVIEW_BACKGROUND = "#ffffff";
 const GRID_COLOR = "#d6d6d6";
+const ANIMATION_EXPORT_DURATION = 2400;
+const ANIMATION_EXPORT_FPS = 24;
+const GIF_EXPORT_SCALE = 1;
+const GIFENC_MODULE_URL = "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js";
+const BACKGROUND_REMOVAL_MODULE_URL = "https://esm.sh/@imgly/background-removal@1.7.0?bundle";
+const BACKGROUND_REMOVAL_PUBLIC_PATH = "https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/";
+let backgroundRemovalModulePromise = null;
+let gifEncoderModulePromise = null;
 
 function cssFontFamily(family) {
   const safeFamily = String(family || "sans-serif").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -82,6 +89,33 @@ function fileBase(text) {
     .replace(/[^\p{L}\p{N}-]+/gu, "")
     .slice(0, 32);
   return normalized || "arabic-ascii";
+}
+
+function loadBackgroundRemovalModule() {
+  if (!backgroundRemovalModulePromise) {
+    backgroundRemovalModulePromise = import(BACKGROUND_REMOVAL_MODULE_URL);
+  }
+
+  return backgroundRemovalModulePromise;
+}
+
+function loadGifEncoderModule() {
+  if (!gifEncoderModulePromise) {
+    gifEncoderModulePromise = import(GIFENC_MODULE_URL);
+  }
+
+  return gifEncoderModulePromise;
+}
+
+function isAnimated() {
+  return elements.animationSelect.value !== "none";
+}
+
+function formatModelProgress(key, loaded, total) {
+  if (!total || total <= 0) return "قص الخلفية...";
+  const percent = Math.min(100, Math.max(0, Math.round((loaded / total) * 100)));
+  if (key.includes("model")) return `تحميل نموذج القص ${percent}%`;
+  return `تجهيز القص ${percent}%`;
 }
 
 function graphemes(text) {
@@ -160,15 +194,54 @@ function loadImageFile(file) {
   });
 }
 
+async function removeImageBackground(file, processId) {
+  const { removeBackground } = await loadBackgroundRemovalModule();
+  if (processId !== state.imageProcessId) return null;
+
+  const blob = await removeBackground(file, {
+    publicPath: BACKGROUND_REMOVAL_PUBLIC_PATH,
+    model: "isnet_quint8",
+    device: "cpu",
+    proxyToWorker: false,
+    output: {
+      format: "image/png",
+      quality: 1,
+    },
+    progress: (key, loaded, total) => {
+      if (processId === state.imageProcessId) {
+        elements.imageInfo.textContent = formatModelProgress(key, loaded, total);
+      }
+    },
+  });
+
+  if (processId !== state.imageProcessId) return null;
+  return loadImageFile(blob);
+}
+
 async function handleImageUpload(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
+  const processId = ++state.imageProcessId;
 
   try {
-    state.sourceImage = await loadImageFile(file);
+    state.sourceImage = null;
     state.sourceImageName = file.name.replace(/\.[^.]+$/, "");
-    elements.imageInfo.textContent = file.name;
     setSourceMode("image");
+    elements.imageInfo.textContent = "قص الخلفية...";
+
+    try {
+      const cutoutImage = await removeImageBackground(file, processId);
+      if (processId !== state.imageProcessId) return;
+      state.sourceImage = cutoutImage;
+      elements.imageInfo.textContent = `${file.name} · تم قص الخلفية`;
+    } catch (modelError) {
+      console.warn("Background removal failed; using original image.", modelError);
+      if (processId !== state.imageProcessId) return;
+      state.sourceImage = await loadImageFile(file);
+      elements.imageInfo.textContent = `${file.name} · استخدمت الصورة الأصلية`;
+    }
+
+    scheduleRender();
   } catch (error) {
     console.error(error);
     state.sourceImage = null;
@@ -184,28 +257,65 @@ function normalizeFontText(value) {
 }
 
 function seedFontRegistry() {
-  state.availableFonts = [];
-  Array.from(elements.fontSelect.options).forEach((option) => {
-    upsertFont(option.value, option.textContent || option.value);
+  state.basicFonts = Array.from(elements.fontSelect.options).map((option) => {
+    return { family: option.value, label: option.textContent || option.value };
   });
+  state.basicFonts.forEach((font) => {
+    state.fontWeightsByFamily.set(font.family, defaultWeights());
+  });
+  state.availableFonts = uniqueFonts(state.basicFonts);
   state.currentFontFamily = elements.fontSelect.value || state.availableFonts[0]?.family || "Geeza Pro";
+  renderWeightOptions();
 }
 
-function upsertFont(family, label = family) {
-  const cleanFamily = String(family || "").trim();
-  if (!cleanFamily) return null;
+function uniqueFonts(fonts) {
+  const fontMap = new Map();
+  fonts.forEach((font) => {
+    const cleanFamily = String(font.family || "").trim();
+    if (!cleanFamily || fontMap.has(cleanFamily)) return;
+    fontMap.set(cleanFamily, {
+      family: cleanFamily,
+      label: String(font.label || cleanFamily).trim() || cleanFamily,
+    });
+  });
+  return Array.from(fontMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
 
-  const cleanLabel = String(label || cleanFamily).trim() || cleanFamily;
-  const existing = state.availableFonts.find((font) => font.family === cleanFamily);
-  if (existing) {
-    existing.label = existing.label || cleanLabel;
-    return existing;
-  }
+function defaultWeights() {
+  return [
+    { label: "Regular · 400", value: "400" },
+    { label: "Semi Bold · 600", value: "600" },
+    { label: "Bold · 800", value: "800" },
+  ];
+}
 
-  const font = { family: cleanFamily, label: cleanLabel };
-  state.availableFonts.push(font);
-  state.availableFonts.sort((a, b) => a.label.localeCompare(b.label));
-  return font;
+function styleNameToWeight(styleName) {
+  const normalized = normalizeFontText(styleName);
+  if (!normalized || normalized === "normal" || normalized === "regular" || normalized === "book") return "400";
+  if (normalized.includes("thin")) return "100";
+  if (normalized.includes("extra light") || normalized.includes("ultra light")) return "200";
+  if (normalized.includes("light")) return "300";
+  if (normalized.includes("medium")) return "500";
+  if (normalized.includes("semi bold") || normalized.includes("semibold") || normalized.includes("demi bold")) return "600";
+  if (normalized.includes("extra bold") || normalized.includes("ultra bold")) return "800";
+  if (normalized.includes("black") || normalized.includes("heavy")) return "900";
+  if (normalized.includes("bold")) return "700";
+  return "400";
+}
+
+function dedupeWeights(weights) {
+  const byValue = new Map();
+  weights.forEach((weight) => {
+    const value = String(weight.value || "400");
+    const label = String(weight.label || value).trim() || value;
+    const visibleLabel = label.includes(value) ? label : `${label} · ${value}`;
+    if (!byValue.has(value)) byValue.set(value, { label: visibleLabel, value });
+  });
+  return Array.from(byValue.values()).sort((a, b) => Number(a.value) - Number(b.value));
+}
+
+function localFonts() {
+  return uniqueFonts(state.deviceFonts);
 }
 
 function getFontLabel(family) {
@@ -224,11 +334,6 @@ function filteredFonts(query) {
   });
 }
 
-function updateFontSearchStatus(matches) {
-  const selectedLabel = getFontLabel(state.currentFontFamily);
-  elements.fontSearchStatus.textContent = `${matches.length} خطوط متاحة · المختار: ${selectedLabel}`;
-}
-
 function renderFontOptions(query = "") {
   const matches = filteredFonts(query);
   const selectedFamily = state.currentFontFamily;
@@ -239,7 +344,6 @@ function renderFontOptions(query = "") {
     const emptyOption = new Option("لا يوجد خط بهذا الاسم", "");
     emptyOption.disabled = true;
     elements.fontSelect.append(emptyOption);
-    updateFontSearchStatus(matches);
     return;
   }
 
@@ -251,31 +355,94 @@ function renderFontOptions(query = "") {
     elements.fontSelect.value = selectedFamily;
   }
 
-  updateFontSearchStatus(matches);
+  renderWeightOptions();
+}
+
+function syncFontSourceButtons() {
+  elements.fontSourceButtons.querySelectorAll("[data-font-source]").forEach((button) => {
+    const active = button.dataset.fontSource === state.fontSource;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-checked", String(active));
+  });
+}
+
+function setAvailableFonts(fonts, preferredFamily = state.currentFontFamily) {
+  state.availableFonts = uniqueFonts(fonts);
+
+  if (!state.availableFonts.length) {
+    renderFontOptions();
+    renderWeightOptions();
+    return;
+  }
+
+  const preferred = state.availableFonts.find((font) => font.family === preferredFamily);
+  state.currentFontFamily = (preferred || state.availableFonts[0]).family;
+  renderFontOptions();
+  elements.fontSelect.value = state.currentFontFamily;
+  renderWeightOptions();
+  scheduleRender();
+}
+
+function showLocalFontMessage(message) {
+  const fonts = localFonts();
+
+  if (fonts.length) {
+    setAvailableFonts(fonts);
+    return;
+  }
+
+  state.availableFonts = [];
+  elements.fontSelect.textContent = "";
+  const emptyOption = new Option("لا توجد خطوط محلية", "");
+  emptyOption.disabled = true;
+  elements.fontSelect.append(emptyOption);
+  elements.fontWeight.textContent = "";
+  const weightOption = new Option(message, "400");
+  weightOption.disabled = true;
+  elements.fontWeight.append(weightOption);
+}
+
+function showBasicFonts() {
+  state.fontSource = "basic";
+  syncFontSourceButtons();
+  setAvailableFonts(state.basicFonts);
+}
+
+async function showLocalFonts() {
+  state.fontSource = "local";
+  syncFontSourceButtons();
+
+  if (!state.localFontsLoaded) {
+    await scanLocalFonts();
+    return;
+  }
+
+  setAvailableFonts(localFonts());
 }
 
 function setFontFamily(family) {
-  const font = upsertFont(family);
+  const font = state.availableFonts.find((item) => item.family === family);
   if (!font) return;
 
   state.currentFontFamily = font.family;
   renderFontOptions();
   elements.fontSelect.value = font.family;
+  renderWeightOptions();
   scheduleRender();
 }
 
-function syncWeightButtons() {
-  const selectedWeight = elements.fontWeight.value;
-  document.querySelectorAll("[data-weight]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.weight === selectedWeight);
+function renderWeightOptions() {
+  const previousWeight = elements.fontWeight.value || "400";
+  const weights = state.fontWeightsByFamily.get(state.currentFontFamily) || defaultWeights();
+  const normalizedWeights = dedupeWeights(weights);
+
+  elements.fontWeight.textContent = "";
+  normalizedWeights.forEach((weight) => {
+    elements.fontWeight.append(new Option(weight.label, weight.value));
   });
-}
 
-function setFontWeight(weight) {
-  if (!weight) return;
-  elements.fontWeight.value = weight;
-  syncWeightButtons();
-  scheduleRender();
+  const preferred = normalizedWeights.find((weight) => weight.value === previousWeight) || normalizedWeights[0];
+  if (preferred) elements.fontWeight.value = preferred.value;
 }
 
 async function loadSelectedFont(size) {
@@ -650,9 +817,34 @@ function getCellAlpha(cell, position, metrics, animation, timestamp, scale) {
     return Math.min(1, 0.18 + distance / 0.16);
   }
 
+  if (animation === "type") {
+    const cycle = (timestamp / 1800) % 1;
+    const indexRatio = (cell.row * Math.max(1, metrics.cols) + cell.col) / Math.max(1, metrics.cols * metrics.rows);
+    const distance = cycle * 1.18 - indexRatio;
+    if (distance < 0) return 0;
+    return Math.min(1, 0.35 + distance / 0.08);
+  }
+
+  if (animation === "rain") {
+    const cycle = (timestamp / 1500 + seededNoise(cell.col, 0, 2) * 0.44) % 1;
+    const rowRatio = cell.row / Math.max(1, metrics.rows);
+    const distance = Math.abs(rowRatio - cycle);
+    return 0.32 + Math.max(0, 1 - distance / 0.12) * 0.68;
+  }
+
   if (animation === "orbit") {
     const pulse = Math.sin(timestamp / 520 + cell.col * 0.25 + cell.row * 0.36);
     return 0.86 + (pulse + 1) * 0.07;
+  }
+
+  if (animation === "breathe") {
+    const pulse = Math.sin(timestamp / 520);
+    return 0.72 + (pulse + 1) * 0.14;
+  }
+
+  if (animation === "jitter") {
+    const noise = seededNoise(cell.col, cell.row, Math.floor(timestamp / 90));
+    return noise > 0.88 ? 0.7 : 1;
   }
 
   if (animation === "glitch") {
@@ -684,6 +876,37 @@ function getAnimationTransform(cell, position, metrics, animation, timestamp, sc
       x: position.x + Math.cos(phase) * 1.7 * scale,
       y: position.y + Math.sin(phase) * 1.7 * scale,
       rotation: position.rotation + Math.sin(phase) * 0.035,
+      char: cell.char,
+    };
+  }
+
+  if (animation === "rain") {
+    const fall = ((timestamp / 1500 + seededNoise(cell.col, cell.row, 5) * 0.34) % 1) - 0.5;
+    return {
+      x: position.x,
+      y: position.y + fall * 4.2 * scale,
+      rotation: position.rotation,
+      char: cell.char,
+    };
+  }
+
+  if (animation === "breathe") {
+    const pulse = Math.sin(timestamp / 520) * 0.018;
+    return {
+      x: position.x,
+      y: position.y,
+      rotation: position.rotation + pulse,
+      char: cell.char,
+    };
+  }
+
+  if (animation === "jitter") {
+    const frame = Math.floor(timestamp / 90);
+    const noise = seededNoise(cell.col, cell.row, frame);
+    return {
+      x: position.x + (noise - 0.5) * 2.8 * scale,
+      y: position.y + (seededNoise(cell.row, cell.col, frame) - 0.5) * 2.2 * scale,
+      rotation: position.rotation,
       char: cell.char,
     };
   }
@@ -787,6 +1010,12 @@ function updateAnimation() {
   const animation = elements.animationSelect.value;
   elements.previewFrame.classList.toggle("is-scan", animation === "scan");
   elements.previewFrame.classList.toggle("is-flicker", animation === "flicker");
+  updateExportOptions();
+}
+
+function updateExportOptions() {
+  const animated = isAnimated();
+  elements.downloadGif.disabled = !animated;
 }
 
 function startAnimationLoop() {
@@ -842,16 +1071,18 @@ function trimTransparentCanvas(sourceCanvas, padding) {
   return trimmed;
 }
 
-function createExportCanvas() {
-  const scale = Number(elements.exportScale.value || 4);
-  const includeBackground = elements.exportBackground.checked;
+function createExportCanvas(options = {}) {
+  const scale = options.scale || Number(elements.exportScale.value || 4);
+  const includeBackground = options.includeBackground ?? elements.exportBackground.checked;
+  const animation = options.animation || "none";
+  const timestamp = options.timestamp || 0;
   const canvas = document.createElement("canvas");
   drawArtCanvas(canvas, state.lastArt, {
     scale,
     includeBackground,
     includeGrid: includeBackground && elements.gridToggle.checked,
-    animation: "none",
-    timestamp: 0,
+    animation,
+    timestamp,
   });
 
   if (includeBackground) return canvas;
@@ -910,94 +1141,43 @@ async function renderArt() {
   startAnimationLoop();
 }
 
-async function handleFontUpload(event) {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
-
-  const loaded = [];
-  const failed = [];
-
-  for (const [index, file] of files.entries()) {
-    try {
-      const buffer = await file.arrayBuffer();
-      const family = `Uploaded Arabic ${Date.now()} ${index}`;
-      const face = new FontFace(family, buffer);
-      await face.load();
-      document.fonts.add(face);
-
-      const label = file.name.replace(/\.(ttf|otf|woff2?|TTF|OTF|WOFF2?)$/, "");
-      upsertFont(family, label);
-      loaded.push({ label, family });
-    } catch (error) {
-      console.error(error);
-      failed.push(file.name);
-    }
-  }
-
-  if (loaded.length) {
-    state.uploadedFonts.unshift(...loaded);
-    setFontFamily(loaded[0].family);
-  } else {
-    elements.fontSearchStatus.textContent = "تعذر تحميل الخطوط";
-  }
-
-  event.target.value = "";
-}
-
 async function scanLocalFonts() {
   if (!("queryLocalFonts" in window)) {
-    elements.fontSearchStatus.textContent = "فحص خطوط الجهاز غير متاح";
+    showLocalFontMessage("فحص خطوط الجهاز غير متاح");
     return;
   }
 
   try {
     const availableFonts = await window.queryLocalFonts();
-    const families = Array.from(new Set(availableFonts.map((font) => font.family))).sort((a, b) => a.localeCompare(b));
+    const families = Array.from(new Set(availableFonts.map((font) => font.family).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const weightMap = new Map();
 
-    families.forEach((family) => {
-      upsertFont(family);
+    availableFonts.forEach((font) => {
+      if (!font.family) return;
+      const label = font.style || font.fullName || "Regular";
+      const value = styleNameToWeight(label);
+      if (!weightMap.has(font.family)) weightMap.set(font.family, []);
+      weightMap.get(font.family).push({ label, value });
     });
 
     const arabicHint = families.find((family) => /arabic|naskh|kufi|amiri|geeza|scheherazade|ruqaa|dubai|cairo|tajawal/i.test(family));
     state.deviceFonts = families.map((family) => ({ label: family, family }));
+    families.forEach((family) => {
+      state.fontWeightsByFamily.set(family, dedupeWeights(weightMap.get(family) || defaultWeights()));
+    });
+    state.localFontsLoaded = true;
 
-    if (arabicHint || families[0]) {
-      setFontFamily(arabicHint || families[0]);
-    } else {
-      renderFontOptions();
+    const fonts = localFonts();
+    if (!fonts.length) {
+      showLocalFontMessage("لم يتم العثور على خطوط محلية");
+      return;
     }
+
+    setAvailableFonts(fonts, arabicHint || state.currentFontFamily);
   } catch (error) {
     console.error(error);
-    elements.fontSearchStatus.textContent = "تعذر فحص خطوط الجهاز";
+    showLocalFontMessage("تعذر فحص خطوط الجهاز");
   }
-}
-
-async function copyArtText() {
-  if (!state.lastText) return;
-
-  let copied = false;
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try {
-      await navigator.clipboard.writeText(state.lastText);
-      copied = true;
-    } catch {
-      copied = false;
-    }
-  }
-
-  if (!copied) {
-    const helper = document.createElement("textarea");
-    helper.value = state.lastText;
-    helper.setAttribute("readonly", "");
-    helper.style.position = "fixed";
-    helper.style.left = "-9999px";
-    document.body.append(helper);
-    helper.select();
-    copied = document.execCommand("copy");
-    helper.remove();
-  }
-
 }
 
 function downloadBlob(blob, filename) {
@@ -1009,11 +1189,6 @@ function downloadBlob(blob, filename) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-}
-
-function downloadTextFile() {
-  const blob = new Blob([state.lastText], { type: "text/plain;charset=utf-8" });
-  downloadBlob(blob, `${state.lastFileBase}.txt`);
 }
 
 function downloadPngFile() {
@@ -1028,6 +1203,54 @@ function downloadPngFile() {
     }
     downloadBlob(blob, `${state.lastFileBase}.png`);
   }, "image/png");
+}
+
+function setAnimatedExportBusy(busy) {
+  if (isAnimated()) {
+    elements.downloadGif.disabled = busy;
+  }
+}
+
+function renderAnimationFrame(canvas, timestamp, scale) {
+  drawArtCanvas(canvas, state.lastArt, {
+    scale,
+    includeBackground: true,
+    includeGrid: elements.gridToggle.checked,
+    animation: elements.animationSelect.value,
+    timestamp,
+  });
+}
+
+async function downloadGifFile() {
+  if (!state.lastArt || !isAnimated()) return;
+
+  setAnimatedExportBusy(true);
+  try {
+    const { GIFEncoder, quantize, applyPalette } = await loadGifEncoderModule();
+    const gif = GIFEncoder();
+    const canvas = document.createElement("canvas");
+    const frameCount = Math.round((ANIMATION_EXPORT_DURATION / 1000) * ANIMATION_EXPORT_FPS);
+    const delay = Math.round(1000 / ANIMATION_EXPORT_FPS);
+
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      const timestamp = (frame / frameCount) * ANIMATION_EXPORT_DURATION;
+      renderAnimationFrame(canvas, timestamp, GIF_EXPORT_SCALE);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const palette = quantize(imageData.data, 96);
+      const index = applyPalette(imageData.data, palette);
+      gif.writeFrame(index, canvas.width, canvas.height, { palette, delay });
+
+      if (frame % 8 === 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+      }
+    }
+
+    gif.finish();
+    downloadBlob(new Blob([gif.bytes()], { type: "image/gif" }), `${state.lastFileBase}.gif`);
+  } finally {
+    setAnimatedExportBusy(false);
+  }
 }
 
 function setMode(mode) {
@@ -1064,6 +1287,7 @@ function toggleExportMenu() {
   elements.animationSelect,
   elements.gridToggle,
   elements.exportBackground,
+  elements.fontWeight,
   elements.sizeRange,
   elements.detailRange,
   elements.thresholdRange,
@@ -1080,20 +1304,28 @@ elements.sourceModeButtons.addEventListener("click", (event) => {
 });
 elements.imageUploadTrigger.addEventListener("click", () => elements.imageUpload.click());
 elements.imageUpload.addEventListener("change", handleImageUpload);
-elements.fontSelect.addEventListener("change", () => setFontFamily(elements.fontSelect.value));
-elements.weightButtons.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-weight]");
-  if (button) setFontWeight(button.dataset.weight);
-});
-elements.fontUploadTrigger.addEventListener("click", () => elements.fontUpload.click());
-elements.fontUpload.addEventListener("change", handleFontUpload);
-elements.scanFonts.addEventListener("click", scanLocalFonts);
-elements.exportToggle.addEventListener("click", toggleExportMenu);
-elements.copyText.addEventListener("click", copyArtText);
-elements.downloadTxt.addEventListener("click", downloadTextFile);
-elements.downloadPng.addEventListener("click", downloadPngFile);
+elements.fontSourceButtons.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-font-source]");
+  if (!button) return;
 
-[elements.copyText, elements.downloadTxt, elements.downloadPng].forEach((button) => {
+  if (button.dataset.fontSource === "local") {
+    showLocalFonts().catch((error) => {
+      console.error(error);
+    });
+  } else {
+    showBasicFonts();
+  }
+});
+elements.fontSelect.addEventListener("change", () => setFontFamily(elements.fontSelect.value));
+elements.exportToggle.addEventListener("click", toggleExportMenu);
+elements.downloadPng.addEventListener("click", downloadPngFile);
+elements.downloadGif.addEventListener("click", () => {
+  downloadGifFile().catch((error) => {
+    console.error(error);
+  });
+});
+
+[elements.downloadPng, elements.downloadGif].forEach((button) => {
   button.addEventListener("click", () => setExportMenu(false));
 });
 
@@ -1120,6 +1352,7 @@ elements.tabButtons.forEach((button) => {
 updateRangeLabels();
 seedFontRegistry();
 renderFontOptions("");
-syncWeightButtons();
+syncFontSourceButtons();
+updateExportOptions();
 setTab("canvas");
 scheduleRender();

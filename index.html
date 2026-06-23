@@ -4,18 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>مولد الأسكي العربي</title>
-    <link rel="stylesheet" href="styles.css?v=20260620q">
+    <link rel="stylesheet" href="styles.css?v=20260622w">
   </head>
   <body>
     <main class="app-shell">
       <section class="output-panel" aria-label="معاينة فن الأسكي">
-        <header class="topbar">
-          <div class="title-block">
-            <h1>مولد الأسكي العربي</h1>
-            <p>اكتب كلمة عربية، اختر الخط، واصنعها من رموز كود.</p>
-          </div>
-        </header>
-
         <div class="toolbar">
           <div class="tab-switch" aria-label="نوع المعاينة">
             <button class="tab-button is-active" type="button" data-tab="canvas">المعاينة</button>
@@ -31,9 +24,8 @@
               <span>تصدير</span>
             </button>
             <div class="export-options" id="exportOptions" role="menu" aria-label="خيارات التصدير">
-              <button id="downloadPng" type="button" role="menuitem">PNG شفاف</button>
-              <button id="downloadTxt" type="button" role="menuitem">TXT</button>
-              <button id="copyText" type="button" role="menuitem">نسخ النص</button>
+              <button id="downloadPng" type="button" role="menuitem">PNG</button>
+              <button id="downloadGif" type="button" role="menuitem" disabled>GIF</button>
             </div>
           </div>
         </div>
@@ -48,8 +40,8 @@
 
       <aside class="control-panel" aria-label="إعدادات التوليد">
         <div class="panel-title">
-          <strong>الإعدادات</strong>
-          <span>فن نصي</span>
+          <h1>مولد الأسكي العربي</h1>
+          <span>فن ASCII</span>
         </div>
 
         <section class="panel-section">
@@ -59,7 +51,7 @@
           </div>
 
           <label class="field text-source-field">
-            <textarea id="sourceText" dir="rtl" rows="3" spellcheck="false">حب</textarea>
+            <textarea id="sourceText" dir="rtl" rows="2" spellcheck="false">حب</textarea>
           </label>
 
           <div class="image-source-panel is-hidden" id="imageSourcePanel">
@@ -72,7 +64,7 @@
               <span>رفع صورة</span>
             </button>
             <input id="imageUpload" type="file" accept="image/*">
-            <div class="source-info" id="imageInfo">PNG شفاف أو صورة بخلفية بسيطة</div>
+            <div class="source-info" id="imageInfo">ارفع صورة وسيتم قص الخلفية تلقائياً</div>
           </div>
 
           <label class="field">
@@ -91,76 +83,72 @@
           <label class="field custom-fill-field" aria-label="رموز تعبئة مخصصة">
             <input id="fillText" dir="ltr" type="text" value="01IM:;/\.,{}[]" spellcheck="false">
           </label>
+
+          <div class="mode-block" aria-label="شكل التعبئة">
+            <button class="mode-button is-active" type="button" data-mode="code">رموز كود</button>
+            <button class="mode-button" type="button" data-mode="shade">تدرج ASCII</button>
+            <button class="mode-button" type="button" data-mode="solid">كتلة</button>
+          </div>
         </section>
 
         <section class="panel-section">
           <h2>الخطوط</h2>
 
-          <label class="field">
-            <span>اختيار الخط</span>
-            <select id="fontSelect">
-              <option value="Geeza Pro">Geeza Pro</option>
-              <option value="Aref Ruqaa">Aref Ruqaa</option>
-              <option value="Noto Sans Arabic">Noto Sans Arabic</option>
-              <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
-              <option value="Amiri">Amiri</option>
-              <option value="Scheherazade New">Scheherazade New</option>
-              <option value="Dubai">Dubai</option>
-              <option value="Tahoma">Tahoma</option>
-              <option value="Arial">Arial</option>
-            </select>
-          </label>
-
-          <div class="font-search-status" id="fontSearchStatus" aria-live="polite">9 خطوط متاحة</div>
-
-          <div class="font-tools" aria-label="إدارة الخطوط">
-            <button class="icon-action" id="fontUploadTrigger" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M12 19V5"></path>
-                <path d="m7 10 5-5 5 5"></path>
-                <path d="M5 19h14"></path>
-              </svg>
-              <span>رفع خط</span>
+          <div class="font-source-list" id="fontSourceButtons" aria-label="مصدر الخطوط">
+            <button class="switch-row is-active" type="button" data-font-source="basic" role="switch" aria-checked="true">
+              <span class="switch-label">خطوط أساسية</span>
+              <span class="switch-control" aria-hidden="true"></span>
             </button>
-            <button class="icon-action" id="scanFonts" type="button">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <rect x="4" y="5" width="16" height="11" rx="1.5"></rect>
-                <path d="M8 20h8"></path>
-                <path d="M12 16v4"></path>
-              </svg>
-              <span>من الجهاز</span>
+            <button class="switch-row" type="button" data-font-source="local" role="switch" aria-checked="false">
+              <span class="switch-label">
+                خطوط الجهاز
+                <span class="help-dot" aria-hidden="true">؟</span>
+              </span>
+              <span class="switch-control" aria-hidden="true"></span>
             </button>
-            <input id="fontUpload" type="file" multiple accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2">
           </div>
 
+          <label class="field">
+            <span class="select-shell">
+              <select id="fontSelect">
+                <option value="Geeza Pro">Geeza Pro</option>
+                <option value="Aref Ruqaa">Aref Ruqaa</option>
+                <option value="Noto Sans Arabic">Noto Sans Arabic</option>
+                <option value="Noto Naskh Arabic">Noto Naskh Arabic</option>
+                <option value="Amiri">Amiri</option>
+                <option value="Scheherazade New">Scheherazade New</option>
+                <option value="Dubai">Dubai</option>
+                <option value="Tahoma">Tahoma</option>
+                <option value="Arial">Arial</option>
+              </select>
+            </span>
+          </label>
+
+          <label class="field">
+            <span class="select-shell">
+              <select id="fontWeight">
+                <option value="400">Regular</option>
+                <option value="600">Semi Bold</option>
+                <option value="800">Bold</option>
+              </select>
+            </span>
+          </label>
         </section>
 
         <section class="panel-section">
           <h2>اللون والسماكة</h2>
 
-          <div class="color-grid">
+          <div class="color-ink-row">
             <label class="color-field">
               <span>لون الرسم</span>
               <input id="artColor" type="color" value="#111111">
             </label>
+
+            <label class="range-field ink-range-field">
+              <span>قوة الحبر <b id="inkValue">3</b></span>
+              <input id="inkRange" type="range" min="1" max="5" value="3" step="1">
+            </label>
           </div>
-
-          <div class="choice-grid weight-block" id="weightButtons" aria-label="سماكة الخط">
-            <button class="weight-button is-active" type="button" data-weight="400">عادي</button>
-            <button class="weight-button" type="button" data-weight="600">متوسط</button>
-            <button class="weight-button" type="button" data-weight="800">ثقيل</button>
-          </div>
-
-          <select id="fontWeight" class="is-hidden" aria-hidden="true" tabindex="-1">
-            <option value="400">عادي</option>
-            <option value="600">متوسط</option>
-            <option value="800">ثقيل</option>
-          </select>
-
-          <label class="range-field ink-range-field">
-            <span>قوة الحبر <b id="inkValue">3</b></span>
-            <input id="inkRange" type="range" min="1" max="5" value="3" step="1">
-          </label>
         </section>
 
         <section class="panel-section">
@@ -183,17 +171,23 @@
         </section>
 
         <section class="panel-section">
-          <h2>الشكل والحركة</h2>
+          <h2>الحركة والشكل</h2>
 
-          <div class="mode-block" aria-label="نمط الرموز">
-            <button class="mode-button is-active" type="button" data-mode="code">رموز كود</button>
-            <button class="mode-button" type="button" data-mode="shade">تدرج ASCII</button>
-            <button class="mode-button" type="button" data-mode="solid">كتلة</button>
-          </div>
-
-          <label class="toggle-field">
-            <input id="gridToggle" type="checkbox" checked>
-            <span>إظهار الشبكة في المعاينة</span>
+          <label class="field">
+            <span>الحركة</span>
+            <select id="animationSelect">
+              <option value="none" selected>ثابت</option>
+              <option value="scan">مسح ضوئي</option>
+              <option value="flicker">وميض رموز</option>
+              <option value="wave">موجة</option>
+              <option value="reveal">ظهور تدريجي</option>
+              <option value="orbit">مدار خفيف</option>
+              <option value="glitch">خلل رقمي</option>
+              <option value="rain">مطر رموز</option>
+              <option value="type">كتابة سريعة</option>
+              <option value="breathe">نبض هادئ</option>
+              <option value="jitter">اهتزاز خفيف</option>
+            </select>
           </label>
 
           <label class="field">
@@ -205,41 +199,22 @@
             </select>
           </label>
 
-          <label class="field">
-            <span>الحركة</span>
-            <select id="animationSelect">
-              <option value="none" selected>ثابت</option>
-              <option value="scan">مسح واضح</option>
-              <option value="flicker">وميض رموز</option>
-              <option value="wave">موجة</option>
-              <option value="reveal">ظهور تدريجي</option>
-              <option value="orbit">مدار خفيف</option>
-              <option value="glitch">خلل رقمي</option>
-            </select>
-          </label>
-        </section>
-
-        <section class="panel-section">
-          <h2>التصدير</h2>
-
           <label class="toggle-field">
-            <input id="exportBackground" type="checkbox">
-            <span>خلفية بيضاء في PNG</span>
-          </label>
-
-          <label class="field">
-            <span>جودة PNG</span>
-            <select id="exportScale">
-              <option value="2">2×</option>
-              <option value="4" selected>4× للطباعة</option>
-              <option value="6">6× كبير</option>
-            </select>
+            <input id="gridToggle" type="checkbox">
+            <span>إظهار الشبكة في المعاينة</span>
           </label>
         </section>
+
+        <input id="exportBackground" type="checkbox" hidden>
+        <select id="exportScale" hidden>
+          <option value="2">2×</option>
+          <option value="4" selected>4× للطباعة</option>
+          <option value="6">6× كبير</option>
+        </select>
       </aside>
     </main>
 
     <canvas id="maskCanvas" hidden></canvas>
-    <script src="app.js?v=20260620q"></script>
+    <script src="app.js?v=20260622w"></script>
   </body>
 </html>
