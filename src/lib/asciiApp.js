@@ -1,4 +1,6 @@
+export function initializeArabicAsciiApp() {
 const elements = {
+  appShell: document.querySelector(".app-shell"),
   sourceModeButtons: document.querySelector("#sourceModeButtons"),
   sourceText: document.querySelector("#sourceText"),
   textSourceField: document.querySelector(".text-source-field"),
@@ -6,6 +8,14 @@ const elements = {
   imageUploadTrigger: document.querySelector("#imageUploadTrigger"),
   imageUpload: document.querySelector("#imageUpload"),
   imageInfo: document.querySelector("#imageInfo"),
+  drawingSourcePanel: document.querySelector("#drawingSourcePanel"),
+  drawingCanvas: document.querySelector("#drawingCanvas"),
+  drawingBrush: document.querySelector("#drawingBrush"),
+  clearDrawing: document.querySelector("#clearDrawing"),
+  expandDrawing: document.querySelector("#expandDrawing"),
+  drawingStageActions: document.querySelector("#drawingStageActions"),
+  drawingResultToggle: document.querySelector("#drawingResultToggle"),
+  collapseDrawing: document.querySelector("#collapseDrawing"),
   fillPreset: document.querySelector("#fillPreset"),
   fillText: document.querySelector("#fillText"),
   fontSourceButtons: document.querySelector("#fontSourceButtons"),
@@ -26,7 +36,6 @@ const elements = {
   thresholdValue: document.querySelector("#thresholdValue"),
   inkValue: document.querySelector("#inkValue"),
   modeButtons: Array.from(document.querySelectorAll(".mode-button")),
-  tabButtons: Array.from(document.querySelectorAll(".tab-button")),
   artCanvas: document.querySelector("#artCanvas"),
   maskCanvas: document.querySelector("#maskCanvas"),
   previewFrame: document.querySelector("#previewFrame"),
@@ -41,8 +50,11 @@ const state = {
   sourceMode: "text",
   sourceImage: null,
   sourceImageName: "",
+  drawingPointerId: null,
+  drawingHasInk: false,
+  drawingExpanded: false,
+  drawingResultView: false,
   mode: "code",
-  tab: "canvas",
   renderId: 0,
   imageProcessId: 0,
   animationId: 0,
@@ -93,7 +105,7 @@ function fileBase(text) {
 
 function loadBackgroundRemovalModule() {
   if (!backgroundRemovalModulePromise) {
-    backgroundRemovalModulePromise = import(BACKGROUND_REMOVAL_MODULE_URL);
+    backgroundRemovalModulePromise = import(/* @vite-ignore */ BACKGROUND_REMOVAL_MODULE_URL);
   }
 
   return backgroundRemovalModulePromise;
@@ -101,7 +113,7 @@ function loadBackgroundRemovalModule() {
 
 function loadGifEncoderModule() {
   if (!gifEncoderModulePromise) {
-    gifEncoderModulePromise = import(GIFENC_MODULE_URL);
+    gifEncoderModulePromise = import(/* @vite-ignore */ GIFENC_MODULE_URL);
   }
 
   return gifEncoderModulePromise;
@@ -172,7 +184,100 @@ function setSourceMode(mode) {
   });
   elements.textSourceField.classList.toggle("is-hidden", mode !== "text");
   elements.imageSourcePanel.classList.toggle("is-hidden", mode !== "image");
+  elements.drawingSourcePanel.classList.toggle("is-hidden", mode !== "drawing");
+  if (mode !== "drawing") {
+    setDrawingExpanded(false);
+    setDrawingResultView(false);
+  }
+  syncDrawingView();
   scheduleRender();
+}
+
+function syncDrawingView() {
+  const isDrawing = state.sourceMode === "drawing";
+  elements.appShell.classList.toggle("is-drawing-expanded", isDrawing && state.drawingExpanded);
+  elements.previewFrame.classList.toggle("is-drawing-source", isDrawing);
+  elements.previewFrame.classList.toggle("is-drawing-result", isDrawing && state.drawingResultView);
+  elements.drawingCanvas.classList.toggle("is-hidden", !isDrawing || state.drawingResultView);
+  elements.drawingStageActions.classList.toggle("is-hidden", !isDrawing || !state.drawingExpanded);
+  elements.drawingResultToggle.textContent = state.drawingResultView ? "تعديل الرسم" : "عرض النتيجة";
+  elements.expandDrawing.textContent = state.drawingExpanded ? "اللوحة مكبرة" : "تكبير اللوحة";
+}
+
+function setDrawingExpanded(expanded) {
+  state.drawingExpanded = Boolean(expanded);
+  if (state.drawingExpanded) {
+    state.drawingResultView = false;
+  }
+  syncDrawingView();
+}
+
+function setDrawingResultView(enabled) {
+  state.drawingResultView = Boolean(enabled);
+  syncDrawingView();
+}
+
+function drawingPoint(event) {
+  const rect = elements.drawingCanvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * elements.drawingCanvas.width,
+    y: ((event.clientY - rect.top) / rect.height) * elements.drawingCanvas.height,
+  };
+}
+
+function drawingContext() {
+  return elements.drawingCanvas.getContext("2d", { willReadFrequently: true });
+}
+
+function clearDrawingCanvas() {
+  const ctx = drawingContext();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, elements.drawingCanvas.width, elements.drawingCanvas.height);
+  ctx.restore();
+  state.drawingHasInk = false;
+  setDrawingResultView(false);
+  if (state.sourceMode === "drawing") scheduleRender();
+}
+
+function beginDrawing(event) {
+  event.preventDefault();
+  state.drawingPointerId = event.pointerId;
+  elements.drawingCanvas.setPointerCapture(event.pointerId);
+
+  const point = drawingPoint(event);
+  const ctx = drawingContext();
+  ctx.beginPath();
+  ctx.moveTo(point.x, point.y);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#111111";
+  ctx.lineWidth = Number(elements.drawingBrush.value) || 18;
+  ctx.lineTo(point.x + 0.01, point.y + 0.01);
+  ctx.stroke();
+  state.drawingHasInk = true;
+  if (state.sourceMode === "drawing") scheduleRender();
+}
+
+function continueDrawing(event) {
+  if (state.drawingPointerId !== event.pointerId) return;
+  event.preventDefault();
+  const point = drawingPoint(event);
+  const ctx = drawingContext();
+  ctx.lineWidth = Number(elements.drawingBrush.value) || 18;
+  ctx.lineTo(point.x, point.y);
+  ctx.stroke();
+  state.drawingHasInk = true;
+  if (state.sourceMode === "drawing") scheduleRender();
+}
+
+function endDrawing(event) {
+  if (state.drawingPointerId !== event.pointerId) return;
+  state.drawingPointerId = null;
+  if (elements.drawingCanvas.hasPointerCapture(event.pointerId)) {
+    elements.drawingCanvas.releasePointerCapture(event.pointerId);
+  }
+  if (state.sourceMode === "drawing") scheduleRender();
 }
 
 function loadImageFile(file) {
@@ -548,6 +653,39 @@ function drawImageMask(image) {
     const darkness = 1 - luminance;
     const score = alpha < 0.98 ? alpha : Math.max(distance, darkness * 0.62);
     const isInk = alpha > 0.06 && score >= threshold;
+
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
+    data[i + 3] = isInk ? 255 : 0;
+  }
+
+  return imageData;
+}
+
+function drawDrawingMask() {
+  const canvas = elements.maskCanvas;
+  canvas.width = MASK_WIDTH;
+  canvas.height = MASK_HEIGHT;
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, MASK_WIDTH, MASK_HEIGHT);
+
+  const source = elements.drawingCanvas;
+  const scale = Math.min((MASK_WIDTH - 140) / source.width, (MASK_HEIGHT - 120) / source.height);
+  const drawWidth = Math.max(1, Math.round(source.width * scale));
+  const drawHeight = Math.max(1, Math.round(source.height * scale));
+  const offsetX = Math.round((MASK_WIDTH - drawWidth) / 2);
+  const offsetY = Math.round((MASK_HEIGHT - drawHeight) / 2);
+  ctx.drawImage(source, offsetX, offsetY, drawWidth, drawHeight);
+
+  const imageData = ctx.getImageData(0, 0, MASK_WIDTH, MASK_HEIGHT);
+  const { data } = imageData;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] / 255;
+    const luminance = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+    const isInk = alpha > 0.05 && luminance < 0.88;
 
     data[i] = 255;
     data[i + 1] = 255;
@@ -1114,6 +1252,18 @@ async function renderArt() {
 
     imageData = drawImageMask(state.sourceImage);
     fileBaseSource = state.sourceImageName || "image-ascii";
+  } else if (state.sourceMode === "drawing") {
+    if (!state.drawingHasInk) {
+      state.lastArt = null;
+      state.lastText = "";
+      elements.textOutput.textContent = "";
+      const ctx = elements.artCanvas.getContext("2d");
+      ctx.clearRect(0, 0, elements.artCanvas.width, elements.artCanvas.height);
+      return;
+    }
+
+    imageData = drawDrawingMask();
+    fileBaseSource = "drawing-ascii";
   } else {
     await loadSelectedFont(requestedSize);
     imageData = drawMask(lines.length ? lines : ["حب"], family, weight, requestedSize);
@@ -1261,15 +1411,6 @@ function setMode(mode) {
   scheduleRender();
 }
 
-function setTab(tab) {
-  state.tab = tab;
-  elements.tabButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.tab === tab);
-  });
-  elements.artCanvas.classList.toggle("is-hidden", tab !== "canvas");
-  elements.textOutput.classList.toggle("is-hidden", tab !== "text");
-}
-
 function setExportMenu(open) {
   elements.exportMenu.classList.toggle("is-open", open);
   elements.exportToggle.setAttribute("aria-expanded", String(open));
@@ -1304,6 +1445,15 @@ elements.sourceModeButtons.addEventListener("click", (event) => {
 });
 elements.imageUploadTrigger.addEventListener("click", () => elements.imageUpload.click());
 elements.imageUpload.addEventListener("change", handleImageUpload);
+elements.drawingCanvas.addEventListener("pointerdown", beginDrawing);
+elements.drawingCanvas.addEventListener("pointermove", continueDrawing);
+elements.drawingCanvas.addEventListener("pointerup", endDrawing);
+elements.drawingCanvas.addEventListener("pointercancel", endDrawing);
+elements.drawingCanvas.addEventListener("pointerleave", endDrawing);
+elements.clearDrawing.addEventListener("click", clearDrawingCanvas);
+elements.expandDrawing.addEventListener("click", () => setDrawingExpanded(true));
+elements.collapseDrawing.addEventListener("click", () => setDrawingExpanded(false));
+elements.drawingResultToggle.addEventListener("click", () => setDrawingResultView(!state.drawingResultView));
 elements.fontSourceButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-font-source]");
   if (!button) return;
@@ -1338,6 +1488,9 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setExportMenu(false);
+    if (state.drawingExpanded) {
+      setDrawingExpanded(false);
+    }
   }
 });
 
@@ -1345,14 +1498,17 @@ elements.modeButtons.forEach((button) => {
   button.addEventListener("click", () => setMode(button.dataset.mode));
 });
 
-elements.tabButtons.forEach((button) => {
-  button.addEventListener("click", () => setTab(button.dataset.tab));
-});
-
 updateRangeLabels();
 seedFontRegistry();
 renderFontOptions("");
 syncFontSourceButtons();
 updateExportOptions();
-setTab("canvas");
+clearDrawingCanvas();
 scheduleRender();
+
+return {
+  destroy() {
+    stopAnimationLoop();
+  },
+};
+}

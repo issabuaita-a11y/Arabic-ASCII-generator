@@ -126,6 +126,7 @@ textarea:focus-visible {
   flex-direction: column;
   padding: 28px 408px 28px 32px;
   background: transparent;
+  transition: padding 160ms ease;
 }
 
 .toolbar {
@@ -136,14 +137,16 @@ textarea:focus-visible {
   margin-top: 16px;
 }
 
-.tab-switch,
+.toolbar--export-only {
+  justify-content: flex-end;
+}
+
 .export-menu {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.tab-button,
 .export-toggle,
 .mode-button {
   font-size: var(--type-label);
@@ -152,7 +155,6 @@ textarea:focus-visible {
   border-radius: 999px;
 }
 
-.tab-button,
 .export-toggle {
   background: var(--ui-surface);
   box-shadow: var(--elevation-panel);
@@ -220,17 +222,11 @@ textarea:focus-visible {
   background: transparent;
 }
 
-.tab-button.is-active,
 .mode-button.is-active {
   color: var(--ui-control-active-text);
   background: var(--ui-control-active);
 }
 
-.tab-button.is-active {
-  box-shadow: none;
-}
-
-.tab-button:hover:not(.is-active),
 .export-toggle:hover,
 .export-toggle:focus-visible {
   background: var(--ui-surface);
@@ -287,6 +283,45 @@ textarea:focus-visible {
   background: var(--art-bg);
 }
 
+.drawing-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.preview-frame.is-drawing-source {
+  overflow: hidden;
+}
+
+.preview-frame.is-drawing-source #artCanvas {
+  opacity: 0.64;
+}
+
+.preview-frame.is-drawing-result #artCanvas {
+  opacity: 1;
+}
+
+.drawing-stage-actions {
+  position: absolute;
+  z-index: 4;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+}
+
+.drawing-stage-actions button {
+  min-height: 34px;
+  padding-inline: 14px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  box-shadow: var(--elevation-panel);
+}
+
 #textOutput {
   min-width: max-content;
   max-width: 100%;
@@ -329,6 +364,21 @@ textarea:focus-visible {
   color: var(--ink);
   background: var(--ui-surface);
   box-shadow: var(--elevation-panel);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.app-shell.is-drawing-expanded .output-panel {
+  padding-right: 32px;
+}
+
+.app-shell.is-drawing-expanded .preview-frame {
+  min-height: calc(100svh - 118px);
+}
+
+.app-shell.is-drawing-expanded .control-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(calc(100% + 32px));
 }
 
 .panel-title {
@@ -415,6 +465,44 @@ textarea:focus-visible {
 
 .image-source-panel {
   margin: 0 0 10px;
+}
+
+.drawing-source-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.drawing-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.drawing-brush-field {
+  display: grid;
+  gap: 7px;
+}
+
+.drawing-brush-field span {
+  color: var(--ui-muted);
+  font-size: var(--type-label);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-title);
+  user-select: text;
+}
+
+.drawing-clear-action {
+  min-height: 34px;
+  padding-inline: 14px;
+}
+
+.drawing-expand-action {
+  min-height: 34px;
+  padding-inline: 14px;
+  color: #ffffff;
+  background: var(--ui-control-active);
 }
 
 .image-source-panel input {
@@ -780,12 +868,10 @@ input[type="range"]::-moz-range-thumb {
     flex-direction: column;
   }
 
-  .tab-switch,
   .export-menu {
     width: 100%;
   }
 
-  .tab-switch button,
   .export-toggle {
     flex: 1;
   }
