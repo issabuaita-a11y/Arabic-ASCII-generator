@@ -1,7 +1,23 @@
 export function initializeArabicAsciiApp() {
 const elements = {
   appShell: document.querySelector(".app-shell"),
+  languageToggle: document.querySelector("#languageToggle"),
+  languageButtons: Array.from(document.querySelectorAll("[data-lang]")),
+  canvasShell: document.querySelector("#canvasShell"),
+  canvasStage: document.querySelector("#canvasStage"),
+  canvasContent: document.querySelector("#canvasContent"),
+  artboard: document.querySelector("#artboard"),
+  artboardMenu: document.querySelector("#artboardMenu"),
+  artboardMenuToggle: document.querySelector("#artboardMenuToggle"),
+  artboardPresetButtons: Array.from(document.querySelectorAll("[data-artboard-preset]")),
+  zoomOut: document.querySelector("#zoomOut"),
+  zoomIn: document.querySelector("#zoomIn"),
+  zoomReadout: document.querySelector("#zoomReadout"),
+  charReadout: document.querySelector("#charReadout"),
+  sidebarToggle: document.querySelector("#sidebarToggle"),
   sourceModeButtons: document.querySelector("#sourceModeButtons"),
+  randomizeText: document.querySelector("#randomizeText"),
+  accordionButtons: Array.from(document.querySelectorAll(".accordion-header")),
   sourceText: document.querySelector("#sourceText"),
   textSourceField: document.querySelector(".text-source-field"),
   imageSourcePanel: document.querySelector("#imageSourcePanel"),
@@ -22,7 +38,19 @@ const elements = {
   fontSelect: document.querySelector("#fontSelect"),
   fontWeight: document.querySelector("#fontWeight"),
   compositionSelect: document.querySelector("#compositionSelect"),
+  colorModeButtons: document.querySelector("#colorModeButtons"),
+  colorModeButtonList: Array.from(document.querySelectorAll("[data-color-mode]")),
+  solidColorPanel: document.querySelector("#solidColorPanel"),
+  gradientColorPanel: document.querySelector("#gradientColorPanel"),
   artColor: document.querySelector("#artColor"),
+  backgroundColor: document.querySelector("#backgroundColor"),
+  colorSwatches: Array.from(document.querySelectorAll("[data-color-target][data-color-value]")),
+  gradientFrom: document.querySelector("#gradientFrom"),
+  gradientTo: document.querySelector("#gradientTo"),
+  gradientStopHandles: Array.from(document.querySelectorAll("[data-gradient-stop]")),
+  gradientDirectionButtons: document.querySelector("#gradientDirectionButtons"),
+  gradientDirectionButtonList: Array.from(document.querySelectorAll("[data-gradient-direction]")),
+  gradientPreview: document.querySelector("#gradientPreview"),
   inkRange: document.querySelector("#inkRange"),
   animationSelect: document.querySelector("#animationSelect"),
   gridToggle: document.querySelector("#gridToggle"),
@@ -40,9 +68,10 @@ const elements = {
   maskCanvas: document.querySelector("#maskCanvas"),
   previewFrame: document.querySelector("#previewFrame"),
   textOutput: document.querySelector("#textOutput"),
-  exportMenu: document.querySelector("#exportMenu"),
-  exportToggle: document.querySelector("#exportToggle"),
   downloadPng: document.querySelector("#downloadPng"),
+  downloadSvg: document.querySelector("#downloadSvg"),
+  copyText: document.querySelector("#copyText"),
+  downloadHtml: document.querySelector("#downloadHtml"),
   downloadGif: document.querySelector("#downloadGif"),
 };
 
@@ -54,7 +83,9 @@ const state = {
   drawingHasInk: false,
   drawingExpanded: false,
   drawingResultView: false,
+  lang: window.localStorage.getItem("arabicAsciiLang") || "ar",
   mode: "code",
+  style: "code",
   renderId: 0,
   imageProcessId: 0,
   animationId: 0,
@@ -64,11 +95,26 @@ const state = {
   availableFonts: [],
   fontWeightsByFamily: new Map(),
   currentFontFamily: "",
+  colorMode: "solid",
+  gradientDirection: "down",
+  gradientFromPosition: 0,
+  gradientToPosition: 100,
+  gradientDraggingStop: null,
   deviceFonts: [],
   lastArt: null,
   lastFamily: "",
   lastText: "",
   lastFileBase: "arabic-ascii",
+  canvasZoom: 1,
+  canvasPanX: 0,
+  canvasPanY: 0,
+  canvasPointerId: null,
+  canvasDragStartX: 0,
+  canvasDragStartY: 0,
+  canvasDragPanX: 0,
+  canvasDragPanY: 0,
+  artboardPreset: "wide",
+  sidebarCollapsed: false,
 };
 
 const DEFAULT_FILL = "01IM:;/\\.,{}[]";
@@ -83,11 +129,250 @@ const GRID_COLOR = "#d6d6d6";
 const ANIMATION_EXPORT_DURATION = 2400;
 const ANIMATION_EXPORT_FPS = 24;
 const GIF_EXPORT_SCALE = 1;
+const PREVIEW_PIXEL_SCALE = 2;
 const GIFENC_MODULE_URL = "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js";
 const BACKGROUND_REMOVAL_MODULE_URL = "https://esm.sh/@imgly/background-removal@1.7.0?bundle";
 const BACKGROUND_REMOVAL_PUBLIC_PATH = "https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/";
+const ARTBOARD_PRESETS = {
+  square: { width: 520, height: 520 },
+  story: { width: 360, height: 640 },
+  post: { width: 448, height: 560 },
+  wide: { width: 640, height: 360 },
+  a4: { width: 420, height: 594 },
+  a4Landscape: { width: 594, height: 420 },
+};
+const ARTBOARD_ART_INSET = 0.12;
 let backgroundRemovalModulePromise = null;
 let gifEncoderModulePromise = null;
+
+const UI_TEXT = {
+  ar: {
+    outputPanel: "معاينة فن الأسكي",
+    canvasTools: "أدوات اللوحة",
+    zoomOut: "تصغير",
+    zoomIn: "تكبير",
+    zoomFit: "ملاءمة اللوحة",
+    artboardSizes: "مقاسات اللوحة",
+    artboardSquare: "مربع 1:1",
+    artboardStory: "ستوري 9:16",
+    artboardPost: "بوست 4:5",
+    artboardWide: "عرضي 16:9",
+    artboardA4: "A4 عمودي",
+    artboardA4Landscape: "A4 عرضي",
+    sidebar: "الشريط",
+    sidebarToggle: "طي الشريط الجانبي",
+    export: "تصدير",
+    exportText: "نص",
+    exportOptions: "خيارات التصدير",
+    artCanvas: "معاينة فن الأسكي الناتج",
+    drawingCanvas: "لوحة الرسم",
+    showResult: "عرض النتيجة",
+    editDrawing: "تعديل الرسم",
+    back: "رجوع",
+    textOutput: "النص القابل للنسخ",
+    source: "النص",
+    random: "عشوائي",
+    text: "نص",
+    image: "صورة",
+    drawing: "رسم",
+    uploadImage: "رفع صورة",
+    imageInfo: "ارفع صورة وسيتم قص الخلفية تلقائياً",
+    brushSize: "حجم الفرشاة",
+    clear: "مسح",
+    expandCanvas: "تكبير اللوحة",
+    canvasExpanded: "اللوحة مكبرة",
+    symbols: "الأسلوب",
+    customSymbols: "رموز مخصصة",
+    fillSymbols: "رموز التعبئة",
+    presetCode: "كود / كلاسيكي",
+    presetNumbers: "أرقام",
+    presetDensity: "درجات كثافة",
+    presetGeometric: "هندسي",
+    presetPunctuation: "نقاط وفواصل",
+    presetLatin: "حروف لاتينية",
+    presetCustom: "أخرى",
+    customFill: "رموز تعبئة مخصصة",
+    fillStyle: "شكل التعبئة",
+    modeCode: "رموز كود",
+    modeShade: "تدرج ASCII",
+    modeSolid: "كتلة",
+    modeOrnament: "زخرفة",
+    fonts: "الخطوط",
+    colorFonts: "اللون والخطوط",
+    color: "اللون",
+    colorMode: "نمط لون الرموز",
+    solidColor: "لون واحد",
+    gradientColor: "تدرج",
+    fontSource: "مصدر الخطوط",
+    basicFonts: "خطوط أساسية",
+    deviceFonts: "خطوط الجهاز",
+    colorWeight: "اللون والسماكة",
+    artColor: "لون الرسم",
+    symbolColor: "لون الرموز",
+    backgroundColor: "لون الخلفية",
+    gradientFrom: "من",
+    gradientTo: "إلى",
+    gradientDirection: "اتجاه التدرج",
+    gradientFromStop: "نقطة بداية التدرج",
+    gradientToStop: "نقطة نهاية التدرج",
+    gradientDown: "من الأعلى للأسفل",
+    gradientRight: "من اليمين لليسار",
+    gradientDiagonal: "قطري",
+    gradientRadial: "دائري",
+    inkDensity: "كثافة الحبر",
+    inkStrength: "قوة الحبر",
+    size: "المقاسات",
+    shapeSize: "حجم الشكل",
+    symbolDetail: "دقة الرموز",
+    edgeSensitivity: "حساسية الحواف",
+    motionShape: "الحركة والشكل",
+    animation: "الحركة",
+    animNone: "ثابت",
+    animScan: "مسح ضوئي",
+    animFlicker: "وميض رموز",
+    animWave: "موجة",
+    animReveal: "ظهور تدريجي",
+    animOrbit: "مدار خفيف",
+    animGlitch: "خلل رقمي",
+    animRain: "مطر رموز",
+    animType: "كتابة سريعة",
+    animBreathe: "نبض هادئ",
+    animJitter: "اهتزاز خفيف",
+    composition: "تكوين الرسم",
+    compositionNormal: "عادي",
+    compositionArc: "قوس",
+    compositionCircle: "دائري",
+    showGrid: "إظهار الشبكة في المعاينة",
+    settings: "إعدادات التوليد",
+    appTitle: "استوديو الأسكي العربي",
+    asciiArt: "",
+    language: "اختيار اللغة",
+    removeBg: "قص الخلفية...",
+    loadCutModel: "تحميل نموذج القص",
+    prepareCut: "تجهيز القص",
+    cutDone: "تم قص الخلفية",
+    originalImageUsed: "استخدمت الصورة الأصلية",
+    imageLoadFailed: "تعذر تحميل الصورة",
+    localFontsUnavailable: "فحص خطوط الجهاز غير متاح",
+    noLocalFonts: "لم يتم العثور على خطوط محلية",
+    localFontsFailed: "تعذر فحص خطوط الجهاز",
+  },
+  en: {
+    outputPanel: "ASCII art preview",
+    canvasTools: "Canvas tools",
+    zoomOut: "Zoom out",
+    zoomIn: "Zoom in",
+    zoomFit: "Fit artboard",
+    artboardSizes: "Artboard sizes",
+    artboardSquare: "Square 1:1",
+    artboardStory: "Story 9:16",
+    artboardPost: "Post 4:5",
+    artboardWide: "Landscape 16:9",
+    artboardA4: "A4 portrait",
+    artboardA4Landscape: "A4 landscape",
+    sidebar: "Sidebar",
+    sidebarToggle: "Collapse sidebar",
+    export: "Export",
+    exportText: "Text",
+    exportOptions: "Export options",
+    artCanvas: "Generated ASCII art preview",
+    drawingCanvas: "Drawing canvas",
+    showResult: "Show result",
+    editDrawing: "Edit drawing",
+    back: "Back",
+    textOutput: "Copyable text",
+    source: "Text",
+    random: "Random",
+    text: "Text",
+    image: "Image",
+    drawing: "Draw",
+    uploadImage: "Upload image",
+    imageInfo: "Upload an image to remove the background automatically",
+    brushSize: "Brush size",
+    clear: "Clear",
+    expandCanvas: "Expand canvas",
+    canvasExpanded: "Canvas expanded",
+    symbols: "Style",
+    customSymbols: "Custom symbols",
+    fillSymbols: "Fill symbols",
+    presetCode: "Code / classic",
+    presetNumbers: "Numbers",
+    presetDensity: "Density ramp",
+    presetGeometric: "Geometric",
+    presetPunctuation: "Dots and punctuation",
+    presetLatin: "Latin letters",
+    presetCustom: "Custom",
+    customFill: "Custom fill symbols",
+    fillStyle: "Fill style",
+    modeCode: "Code symbols",
+    modeShade: "ASCII gradient",
+    modeSolid: "Block",
+    modeOrnament: "Ornament",
+    fonts: "Fonts",
+    colorFonts: "Color and fonts",
+    color: "Color",
+    colorMode: "Symbol color mode",
+    solidColor: "Solid",
+    gradientColor: "Gradient",
+    fontSource: "Font source",
+    basicFonts: "Basic fonts",
+    deviceFonts: "Device fonts",
+    colorWeight: "Color and weight",
+    artColor: "Art color",
+    symbolColor: "Symbol color",
+    backgroundColor: "Background color",
+    gradientFrom: "From",
+    gradientTo: "To",
+    gradientDirection: "Gradient direction",
+    gradientFromStop: "Gradient start stop",
+    gradientToStop: "Gradient end stop",
+    gradientDown: "Top to bottom",
+    gradientRight: "Left to right",
+    gradientDiagonal: "Diagonal",
+    gradientRadial: "Radial",
+    inkDensity: "Ink density",
+    inkStrength: "Ink strength",
+    size: "Size",
+    shapeSize: "Shape size",
+    symbolDetail: "Symbol detail",
+    edgeSensitivity: "Edge sensitivity",
+    motionShape: "Motion and shape",
+    animation: "Animation",
+    animNone: "Static",
+    animScan: "Scan line",
+    animFlicker: "Symbol flicker",
+    animWave: "Wave",
+    animReveal: "Reveal",
+    animOrbit: "Soft orbit",
+    animGlitch: "Digital glitch",
+    animRain: "Symbol rain",
+    animType: "Fast typing",
+    animBreathe: "Soft pulse",
+    animJitter: "Light jitter",
+    composition: "Composition",
+    compositionNormal: "Normal",
+    compositionArc: "Arc",
+    compositionCircle: "Circle",
+    showGrid: "Show grid in preview",
+    settings: "Generator settings",
+    appTitle: "Arabic ASCII Studio",
+    asciiArt: "",
+    language: "Language",
+    removeBg: "Removing background...",
+    loadCutModel: "Loading cutout model",
+    prepareCut: "Preparing cutout",
+    cutDone: "Background removed",
+    originalImageUsed: "Original image used",
+    imageLoadFailed: "Could not load image",
+    localFontsUnavailable: "Device font scan is unavailable",
+    noLocalFonts: "No local fonts found",
+    localFontsFailed: "Could not scan device fonts",
+  },
+};
+
+function t(key) {
+  return UI_TEXT[state.lang][key] || UI_TEXT.ar[key] || key;
+}
 
 function cssFontFamily(family) {
   const safeFamily = String(family || "sans-serif").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -124,10 +409,10 @@ function isAnimated() {
 }
 
 function formatModelProgress(key, loaded, total) {
-  if (!total || total <= 0) return "قص الخلفية...";
+  if (!total || total <= 0) return t("removeBg");
   const percent = Math.min(100, Math.max(0, Math.round((loaded / total) * 100)));
-  if (key.includes("model")) return `تحميل نموذج القص ${percent}%`;
-  return `تجهيز القص ${percent}%`;
+  if (key.includes("model")) return `${t("loadCutModel")} ${percent}%`;
+  return `${t("prepareCut")} ${percent}%`;
 }
 
 function graphemes(text) {
@@ -140,11 +425,151 @@ function graphemes(text) {
   return Array.from(clean);
 }
 
+function applyLanguage(lang) {
+  state.lang = lang === "en" ? "en" : "ar";
+  window.localStorage.setItem("arabicAsciiLang", state.lang);
+  document.documentElement.lang = state.lang;
+  document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";
+
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+
+  document.querySelectorAll("[data-i18n-attr]").forEach((node) => {
+    node.dataset.i18nAttr.split(";").forEach((entry) => {
+      const [attribute, key] = entry.split(":");
+      if (attribute && key) node.setAttribute(attribute, t(key));
+    });
+  });
+
+  elements.languageButtons.forEach((button) => {
+    const isActive = button.dataset.lang === state.lang;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  if (state.sourceImageName || state.sourceMode !== "image") {
+    elements.imageInfo.textContent = state.sourceMode === "image" ? elements.imageInfo.textContent : t("imageInfo");
+  }
+
+  syncDrawingView();
+}
+
 function updateRangeLabels() {
   elements.sizeValue.textContent = elements.sizeRange.value;
   elements.detailValue.textContent = elements.detailRange.value;
   elements.thresholdValue.textContent = elements.thresholdRange.value;
   elements.inkValue.textContent = elements.inkRange.value;
+  [elements.sizeRange, elements.detailRange, elements.thresholdRange, elements.inkRange, elements.drawingBrush].forEach(updateRangeFill);
+}
+
+function updateRangeFill(range) {
+  if (!range) return;
+  const min = Number(range.min || 0);
+  const max = Number(range.max || 100);
+  const value = Number(range.value || 0);
+  const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  range.style.setProperty("--value-percent", `${Math.max(0, Math.min(100, percent))}%`);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function applyCanvasTransform() {
+  if (!elements.canvasContent) return;
+  elements.canvasContent.style.setProperty("--canvas-pan-x", `${state.canvasPanX}px`);
+  elements.canvasContent.style.setProperty("--canvas-pan-y", `${state.canvasPanY}px`);
+  elements.canvasContent.style.setProperty("--canvas-zoom", String(state.canvasZoom));
+  if (elements.zoomReadout) {
+    elements.zoomReadout.textContent = `${Math.round(state.canvasZoom * 100)}%`;
+  }
+}
+
+function setCanvasZoom(nextZoom) {
+  state.canvasZoom = clamp(nextZoom, 0.25, 3);
+  applyCanvasTransform();
+}
+
+function fitCanvasToStage() {
+  if (!elements.canvasStage || !elements.artboard) return;
+  const stageRect = elements.canvasStage.getBoundingClientRect();
+  const preset = ARTBOARD_PRESETS[state.artboardPreset] || ARTBOARD_PRESETS.wide;
+  const zoom = Math.min((stageRect.width - 96) / preset.width, (stageRect.height - 96) / preset.height, 1.4);
+  state.canvasPanX = 0;
+  state.canvasPanY = 0;
+  setCanvasZoom(clamp(zoom, 0.35, 1.4));
+}
+
+function setArtboardMenu(open) {
+  if (!elements.artboardMenu || !elements.artboardMenuToggle) return;
+  elements.artboardMenu.classList.toggle("is-open", open);
+  elements.artboardMenuToggle.setAttribute("aria-expanded", String(open));
+}
+
+function setArtboardPreset(presetName) {
+  const preset = ARTBOARD_PRESETS[presetName] || ARTBOARD_PRESETS.wide;
+  state.artboardPreset = presetName in ARTBOARD_PRESETS ? presetName : "wide";
+  elements.artboard.style.setProperty("--artboard-width", `${preset.width}px`);
+  elements.artboard.style.setProperty("--artboard-height", `${preset.height}px`);
+  elements.artboard.dataset.artboard = state.artboardPreset;
+  elements.artboardPresetButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.artboardPreset === state.artboardPreset);
+  });
+  setArtboardMenu(false);
+  fitCanvasToStage();
+  if (state.lastArt) {
+    drawPreview(state.lastArt, 0);
+  }
+}
+
+function beginCanvasPan(event) {
+  if (event.button !== 0 || event.target.closest("button, input, select, textarea, .preview-frame")) return;
+  event.preventDefault();
+  state.canvasPointerId = event.pointerId;
+  state.canvasDragStartX = event.clientX;
+  state.canvasDragStartY = event.clientY;
+  state.canvasDragPanX = state.canvasPanX;
+  state.canvasDragPanY = state.canvasPanY;
+  elements.canvasStage.setPointerCapture(event.pointerId);
+  elements.canvasStage.classList.add("is-panning");
+}
+
+function continueCanvasPan(event) {
+  if (state.canvasPointerId !== event.pointerId) return;
+  event.preventDefault();
+  state.canvasPanX = state.canvasDragPanX + (event.clientX - state.canvasDragStartX);
+  state.canvasPanY = state.canvasDragPanY + (event.clientY - state.canvasDragStartY);
+  applyCanvasTransform();
+}
+
+function endCanvasPan(event) {
+  if (state.canvasPointerId !== event.pointerId) return;
+  state.canvasPointerId = null;
+  if (elements.canvasStage.hasPointerCapture(event.pointerId)) {
+    elements.canvasStage.releasePointerCapture(event.pointerId);
+  }
+  elements.canvasStage.classList.remove("is-panning");
+}
+
+function handleCanvasWheel(event) {
+  if (!elements.canvasStage?.contains(event.target)) return;
+  event.preventDefault();
+  if (event.ctrlKey || event.metaKey || Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+    const direction = event.deltaY > 0 ? -1 : 1;
+    setCanvasZoom(state.canvasZoom + direction * 0.08);
+    return;
+  }
+  state.canvasPanX -= event.deltaX;
+  state.canvasPanY -= event.deltaY;
+  applyCanvasTransform();
+}
+
+function toggleSidebar() {
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  elements.appShell.classList.toggle("is-sidebar-collapsed", state.sidebarCollapsed);
+  elements.sidebarToggle.setAttribute("aria-expanded", String(!state.sidebarCollapsed));
+  window.requestAnimationFrame(fitCanvasToStage);
 }
 
 function scheduleRender() {
@@ -177,6 +602,74 @@ function handleCustomFillInput() {
   scheduleRender();
 }
 
+function randomizeText() {
+  const samples = [
+    "حب",
+    "سلام",
+    "نور",
+    "حلم",
+    "أثر",
+    "عمّان",
+    "حرية",
+    "ذاكرة",
+  ];
+  const fills = [DEFAULT_FILL, "0123456789", ".-:=+*#%@", "[]{}()/\\<>", ".,:;"];
+  const modes = Array.from(elements.modeButtons);
+  const text = samples[Math.floor(Math.random() * samples.length)];
+  const fill = fills[Math.floor(Math.random() * fills.length)];
+  const button = modes[Math.floor(Math.random() * modes.length)] || modes[0];
+
+  elements.sourceText.value = text;
+  elements.fillText.value = button?.dataset.fillValue || fill;
+  elements.fillPreset.value = "custom";
+
+  if (button) {
+    setMode(button.dataset.mode, button.dataset.style || button.dataset.mode);
+  } else {
+    scheduleRender();
+  }
+}
+
+function toggleAccordion(button) {
+  const section = button.closest(".accordion-section");
+  const isOpen = !section.classList.contains("is-open");
+  section.classList.toggle("is-open", isOpen);
+  button.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    scrollSectionIntoPanel(section);
+  }
+}
+
+function scrollSectionIntoPanel(section) {
+  const panel = section.closest(".control-panel");
+  if (!panel) return;
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const panelRect = panel.getBoundingClientRect();
+      const sectionRect = section.getBoundingClientRect();
+      const headerHeight = panel.querySelector(".panel-title")?.offsetHeight || 0;
+      const exportHeight = document.querySelector(".export-dock")?.offsetHeight || 0;
+      const topEdge = panelRect.top + headerHeight + 12;
+      const bottomEdge = panelRect.bottom - exportHeight - 12;
+      let target = panel.scrollTop;
+
+      if (sectionRect.bottom > bottomEdge) {
+        target += sectionRect.bottom - bottomEdge;
+      }
+
+      if (sectionRect.top < topEdge) {
+        target += sectionRect.top - topEdge;
+      }
+
+      panel.scrollTo({
+        top: Math.max(0, target),
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    });
+  });
+}
+
 function setSourceMode(mode) {
   state.sourceMode = mode;
   elements.sourceModeButtons.querySelectorAll("[data-source-mode]").forEach((button) => {
@@ -200,8 +693,8 @@ function syncDrawingView() {
   elements.previewFrame.classList.toggle("is-drawing-result", isDrawing && state.drawingResultView);
   elements.drawingCanvas.classList.toggle("is-hidden", !isDrawing || state.drawingResultView);
   elements.drawingStageActions.classList.toggle("is-hidden", !isDrawing || !state.drawingExpanded);
-  elements.drawingResultToggle.textContent = state.drawingResultView ? "تعديل الرسم" : "عرض النتيجة";
-  elements.expandDrawing.textContent = state.drawingExpanded ? "اللوحة مكبرة" : "تكبير اللوحة";
+  elements.drawingResultToggle.textContent = state.drawingResultView ? t("editDrawing") : t("showResult");
+  elements.expandDrawing.textContent = state.drawingExpanded ? t("canvasExpanded") : t("expandCanvas");
 }
 
 function setDrawingExpanded(expanded) {
@@ -332,25 +825,25 @@ async function handleImageUpload(event) {
     state.sourceImage = null;
     state.sourceImageName = file.name.replace(/\.[^.]+$/, "");
     setSourceMode("image");
-    elements.imageInfo.textContent = "قص الخلفية...";
+    elements.imageInfo.textContent = t("removeBg");
 
     try {
       const cutoutImage = await removeImageBackground(file, processId);
       if (processId !== state.imageProcessId) return;
       state.sourceImage = cutoutImage;
-      elements.imageInfo.textContent = `${file.name} · تم قص الخلفية`;
+      elements.imageInfo.textContent = `${file.name} · ${t("cutDone")}`;
     } catch (modelError) {
       console.warn("Background removal failed; using original image.", modelError);
       if (processId !== state.imageProcessId) return;
       state.sourceImage = await loadImageFile(file);
-      elements.imageInfo.textContent = `${file.name} · استخدمت الصورة الأصلية`;
+      elements.imageInfo.textContent = `${file.name} · ${t("originalImageUsed")}`;
     }
 
     scheduleRender();
   } catch (error) {
     console.error(error);
     state.sourceImage = null;
-    elements.imageInfo.textContent = "تعذر تحميل الصورة";
+    elements.imageInfo.textContent = t("imageLoadFailed");
     scheduleRender();
   }
 
@@ -795,9 +1288,224 @@ function buildTextArt(imageData, bounds, text, filler) {
 }
 
 function getArtColors() {
-  const artColor = elements.artColor.value || "#111111";
-  const bgColor = PREVIEW_BACKGROUND;
-  return { artColor, bgColor };
+  const artColor = elements.artColor?.value || "#111111";
+  const bgColor = elements.backgroundColor?.value || PREVIEW_BACKGROUND;
+  const gradientFrom = elements.gradientFrom?.value || "#9b51e0";
+  const gradientTo = elements.gradientTo?.value || "#ff6a3d";
+  const fromPosition = Math.max(0, Math.min(100, state.gradientFromPosition));
+  const toPosition = Math.max(0, Math.min(100, state.gradientToPosition));
+  return {
+    artColor,
+    bgColor,
+    colorMode: state.colorMode,
+    gradientFrom,
+    gradientTo,
+    fromPosition,
+    toPosition,
+    gradientDirection: state.gradientDirection,
+  };
+}
+
+function gradientStops(colors) {
+  return [
+    { color: colors.gradientFrom, position: colors.fromPosition / 100 },
+    { color: colors.gradientTo, position: colors.toPosition / 100 },
+  ].sort((a, b) => a.position - b.position);
+}
+
+function hexToRgb(hex) {
+  const clean = String(hex || "#000000").replace("#", "");
+  const normalized = clean.length === 3
+    ? clean.split("").map((char) => char + char).join("")
+    : clean.padEnd(6, "0").slice(0, 6);
+  const value = Number.parseInt(normalized, 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+}
+
+function rgbCss({ r, g, b }) {
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+function mixRgb(from, to, amount) {
+  return {
+    r: from.r + (to.r - from.r) * amount,
+    g: from.g + (to.g - from.g) * amount,
+    b: from.b + (to.b - from.b) * amount,
+  };
+}
+
+function getArtBounds(art, metrics, scale) {
+  if (!art.cells.length) {
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: metrics.width,
+      maxY: metrics.height,
+      centerX: metrics.width / 2,
+      centerY: metrics.height / 2,
+      width: metrics.width,
+      height: metrics.height,
+    };
+  }
+
+  const halfWidth = (metrics.cellWidth || CANVAS_CELL_WIDTH * scale) * 0.56;
+  const halfHeight = (metrics.cellHeight || CANVAS_CELL_HEIGHT * scale) * 0.58;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  art.cells.forEach((cell) => {
+    const position = getCellPosition(cell, art, metrics);
+    minX = Math.min(minX, position.x - halfWidth);
+    minY = Math.min(minY, position.y - halfHeight);
+    maxX = Math.max(maxX, position.x + halfWidth);
+    maxY = Math.max(maxY, position.y + halfHeight);
+  });
+
+  minX = Math.max(0, minX);
+  minY = Math.max(0, minY);
+  maxX = Math.min(metrics.width, maxX);
+  maxY = Math.min(metrics.height, maxY);
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+}
+
+function gradientPositionForPoint(position, bounds, direction) {
+  if (direction === "right") {
+    return (position.x - bounds.minX) / bounds.width;
+  }
+
+  if (direction === "diagonal") {
+    const dx = bounds.width;
+    const dy = bounds.height;
+    const length = dx * dx + dy * dy || 1;
+    return ((position.x - bounds.minX) * dx + (position.y - bounds.minY) * dy) / length;
+  }
+
+  if (direction === "radial") {
+    const radius = Math.max(bounds.width, bounds.height) / 2 || 1;
+    return Math.hypot(position.x - bounds.centerX, position.y - bounds.centerY) / radius;
+  }
+
+  return (position.y - bounds.minY) / bounds.height;
+}
+
+function colorForGradientPosition(position, bounds, colors) {
+  const stops = gradientStops(colors);
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  const t = Math.max(0, Math.min(1, gradientPositionForPoint(position, bounds, colors.gradientDirection)));
+
+  if (t <= first.position) {
+    return first.color;
+  }
+
+  if (t >= last.position) {
+    return last.color;
+  }
+
+  const span = Math.max(0.001, last.position - first.position);
+  const amount = (t - first.position) / span;
+  return rgbCss(mixRgb(hexToRgb(first.color), hexToRgb(last.color), amount));
+}
+
+function createArtFill(ctx, art, metrics, colors, scale) {
+  if (colors.colorMode !== "gradient") {
+    return colors.artColor;
+  }
+
+  const bounds = getArtBounds(art, metrics, scale);
+
+  if (colors.gradientDirection === "radial") {
+    const radius = Math.max(bounds.width, bounds.height) / 2;
+    const gradient = ctx.createRadialGradient(
+      bounds.centerX,
+      bounds.centerY,
+      0,
+      bounds.centerX,
+      bounds.centerY,
+      radius
+    );
+    gradientStops(colors).forEach((stop) => gradient.addColorStop(stop.position, stop.color));
+    return gradient;
+  }
+
+  const points = {
+    right: [bounds.minX, bounds.centerY, bounds.maxX, bounds.centerY],
+    diagonal: [bounds.minX, bounds.minY, bounds.maxX, bounds.maxY],
+    down: [bounds.centerX, bounds.minY, bounds.centerX, bounds.maxY],
+  }[colors.gradientDirection] || [bounds.centerX, bounds.minY, bounds.centerX, bounds.maxY];
+  const gradient = ctx.createLinearGradient(...points);
+  gradientStops(colors).forEach((stop) => gradient.addColorStop(stop.position, stop.color));
+  return gradient;
+}
+
+function currentArtCssColor() {
+  const colors = getArtColors();
+  if (colors.colorMode === "gradient") {
+    const stops = gradientStops(colors)
+      .map((stop) => `${stop.color} ${Math.round(stop.position * 100)}%`)
+      .join(", ");
+    if (colors.gradientDirection === "radial") {
+      return `radial-gradient(circle, ${stops})`;
+    }
+    return `linear-gradient(${colors.gradientDirection === "right" ? "90deg" : colors.gradientDirection === "diagonal" ? "135deg" : "180deg"}, ${stops})`;
+  }
+  return colors.artColor;
+}
+
+function updateGradientPreview() {
+  if (!elements.gradientPreview) return;
+  const colors = getArtColors();
+  elements.gradientPreview.style.background = currentArtCssColor();
+  elements.gradientStopHandles.forEach((handle) => {
+    const isFrom = handle.dataset.gradientStop === "from";
+    handle.style.setProperty("--stop-position", `${isFrom ? colors.fromPosition : colors.toPosition}%`);
+    handle.style.setProperty("--stop-color", isFrom ? colors.gradientFrom : colors.gradientTo);
+  });
+}
+
+function updateColorPanels() {
+  elements.colorModeButtonList.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.colorMode === state.colorMode);
+  });
+  elements.solidColorPanel?.classList.toggle("is-hidden", state.colorMode !== "solid");
+  elements.gradientColorPanel?.classList.toggle("is-hidden", state.colorMode !== "gradient");
+  elements.gradientDirectionButtonList.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.gradientDirection === state.gradientDirection);
+  });
+  updateGradientPreview();
+}
+
+function syncColorSwatches(target) {
+  const input = target === "background" ? elements.backgroundColor : elements.artColor;
+  if (!input) return;
+  const value = input.value.toLowerCase();
+  elements.colorSwatches
+    .filter((button) => button.dataset.colorTarget === target)
+    .forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.colorValue.toLowerCase() === value);
+    });
+}
+
+function updateColorCssVars() {
+  const colors = getArtColors();
+  document.documentElement.style.setProperty("--art-color", colors.artColor);
+  document.documentElement.style.setProperty("--art-bg", colors.bgColor);
 }
 
 function getLayoutMetrics(art, scale) {
@@ -847,6 +1555,26 @@ function getLayoutMetrics(art, scale) {
     cellHeight,
     width: Math.ceil(baseWidth),
     height: Math.ceil(baseHeight),
+  };
+}
+
+function getArtboardCanvasSize(scale = 1) {
+  const preset = ARTBOARD_PRESETS[state.artboardPreset] || ARTBOARD_PRESETS.wide;
+  return {
+    width: Math.max(1, Math.round(preset.width * scale)),
+    height: Math.max(1, Math.round(preset.height * scale)),
+  };
+}
+
+function getArtboardFit(bounds, targetWidth, targetHeight) {
+  const inset = Math.max(18, Math.min(targetWidth, targetHeight) * ARTBOARD_ART_INSET);
+  const availableWidth = Math.max(1, targetWidth - inset * 2);
+  const availableHeight = Math.max(1, targetHeight - inset * 2);
+  const scale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height);
+  return {
+    scale,
+    x: targetWidth / 2 - bounds.centerX * scale,
+    y: targetHeight / 2 - bounds.centerY * scale,
   };
 }
 
@@ -1074,49 +1802,69 @@ function getAnimationTransform(cell, position, metrics, animation, timestamp, sc
 }
 
 function drawArtCanvas(canvas, art, options = {}) {
-  const scale = options.scale || 1;
-  const metrics = getLayoutMetrics(art, scale);
-  const { artColor, bgColor } = getArtColors();
+  const outputScale = options.scale || 1;
+  const fitToArtboard = options.fitToArtboard !== false;
+  const renderScale = fitToArtboard ? 1 : outputScale;
+  const metrics = getLayoutMetrics(art, renderScale);
+  const naturalArtBounds = getArtBounds(art, metrics, renderScale);
+  const target = fitToArtboard
+    ? getArtboardCanvasSize(outputScale)
+    : { width: metrics.width, height: metrics.height };
+  const fit = fitToArtboard ? getArtboardFit(naturalArtBounds, target.width, target.height) : { scale: 1, x: 0, y: 0 };
+  const colors = getArtColors();
   const includeBackground = options.includeBackground !== false;
   const includeGrid = options.includeGrid === true && includeBackground;
   const animation = options.animation || "none";
   const timestamp = options.timestamp || 0;
   const inkStrength = Math.max(1, Math.min(5, Number(elements.inkRange.value || 3)));
   const glyphWeight = Math.max(Number(elements.fontWeight.value || 800), inkStrength >= 3 ? 800 : 700);
-  const glyphSize = Math.max(8, Math.round(13 * scale));
-  const strokeWidth = Math.max(0, (inkStrength - 1) * 0.24 * scale);
+  const glyphSize = Math.max(8, Math.round(13 * renderScale));
+  const strokeWidth = Math.max(0, (inkStrength - 1) * 0.24 * renderScale);
 
-  if (canvas.width !== metrics.width) canvas.width = metrics.width;
-  if (canvas.height !== metrics.height) canvas.height = metrics.height;
+  if (canvas.width !== target.width) canvas.width = target.width;
+  if (canvas.height !== target.height) canvas.height = target.height;
 
   const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, metrics.width, metrics.height);
+  ctx.clearRect(0, 0, target.width, target.height);
 
   if (includeBackground) {
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, metrics.width, metrics.height);
+    ctx.fillStyle = colors.bgColor;
+    ctx.fillRect(0, 0, target.width, target.height);
   }
 
+  ctx.save();
+  ctx.translate(fit.x, fit.y);
+  ctx.scale(fit.scale, fit.scale);
+
   if (includeGrid) {
-    drawGrid(ctx, art, metrics, GRID_COLOR, scale);
+    drawGrid(ctx, art, metrics, GRID_COLOR, renderScale);
   }
 
   ctx.font = `${glyphWeight} ${glyphSize}px "Courier New", "Menlo", monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.direction = "ltr";
-  ctx.fillStyle = artColor;
-  ctx.strokeStyle = artColor;
+  const artBounds = naturalArtBounds;
+  const artFill = colors.colorMode === "gradient" ? null : createArtFill(ctx, art, metrics, colors, renderScale);
+  if (artFill) {
+    ctx.fillStyle = artFill;
+    ctx.strokeStyle = artFill;
+  }
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.lineWidth = strokeWidth;
 
   art.cells.forEach((cell) => {
     const position = getCellPosition(cell, art, metrics);
-    const alpha = getCellAlpha(cell, position, metrics, animation, timestamp, scale);
-    const animated = getAnimationTransform(cell, position, metrics, animation, timestamp, scale);
+    const alpha = getCellAlpha(cell, position, metrics, animation, timestamp, renderScale);
+    const animated = getAnimationTransform(cell, position, metrics, animation, timestamp, renderScale);
     ctx.save();
     ctx.globalAlpha = alpha;
+    if (colors.colorMode === "gradient") {
+      const cellColor = colorForGradientPosition(position, artBounds, colors);
+      ctx.fillStyle = cellColor;
+      ctx.strokeStyle = cellColor;
+    }
     ctx.translate(animated.x, animated.y);
     ctx.rotate(animated.rotation);
     if (strokeWidth > 0) {
@@ -1125,13 +1873,18 @@ function drawArtCanvas(canvas, art, options = {}) {
     ctx.fillText(animated.char, 0, 0);
     ctx.restore();
   });
+
+  ctx.restore();
 }
 
 function drawPreview(art, timestamp = 0) {
+  updateColorCssVars();
+  updateGradientPreview();
+  const pixelScale = Math.max(PREVIEW_PIXEL_SCALE, Math.min(3, window.devicePixelRatio || 1));
   drawArtCanvas(elements.artCanvas, art, {
-    scale: 1,
+    scale: pixelScale,
     includeBackground: true,
-    includeGrid: elements.gridToggle.checked,
+    includeGrid: elements.gridToggle?.checked || false,
     animation: elements.animationSelect.value,
     timestamp,
   });
@@ -1153,7 +1906,9 @@ function updateAnimation() {
 
 function updateExportOptions() {
   const animated = isAnimated();
-  elements.downloadGif.disabled = !animated;
+  if (elements.downloadGif) {
+    elements.downloadGif.disabled = !animated;
+  }
 }
 
 function startAnimationLoop() {
@@ -1218,7 +1973,7 @@ function createExportCanvas(options = {}) {
   drawArtCanvas(canvas, state.lastArt, {
     scale,
     includeBackground,
-    includeGrid: includeBackground && elements.gridToggle.checked,
+    includeGrid: includeBackground && (elements.gridToggle?.checked || false),
     animation,
     timestamp,
   });
@@ -1280,11 +2035,25 @@ async function renderArt() {
   state.lastFamily = family;
   state.lastText = art.lines.join("\n");
   state.lastFileBase = fileBase(fileBaseSource);
+  if (elements.charReadout) {
+    elements.charReadout.textContent = `${art.cols} × ${art.rows} chars`;
+  }
 
   drawPreview(art, 0);
   elements.textOutput.textContent = state.lastText;
-  elements.textOutput.style.color = elements.artColor.value || "#111111";
-  elements.textOutput.style.backgroundColor = "transparent";
+  const colors = getArtColors();
+  if (colors.colorMode === "gradient") {
+    elements.textOutput.style.color = "transparent";
+    elements.textOutput.style.backgroundImage = currentArtCssColor();
+    elements.textOutput.style.backgroundClip = "text";
+    elements.textOutput.style.webkitBackgroundClip = "text";
+  } else {
+    elements.textOutput.style.color = colors.artColor;
+    elements.textOutput.style.backgroundImage = "none";
+    elements.textOutput.style.backgroundClip = "";
+    elements.textOutput.style.webkitBackgroundClip = "";
+  }
+  elements.textOutput.style.backgroundColor = colors.bgColor;
   elements.textOutput.style.fontWeight = String(
     Math.max(Number(elements.fontWeight.value || 800), Number(elements.inkRange.value || 3) >= 3 ? 800 : 700)
   );
@@ -1293,7 +2062,7 @@ async function renderArt() {
 
 async function scanLocalFonts() {
   if (!("queryLocalFonts" in window)) {
-    showLocalFontMessage("فحص خطوط الجهاز غير متاح");
+    showLocalFontMessage(t("localFontsUnavailable"));
     return;
   }
 
@@ -1319,14 +2088,14 @@ async function scanLocalFonts() {
 
     const fonts = localFonts();
     if (!fonts.length) {
-      showLocalFontMessage("لم يتم العثور على خطوط محلية");
+      showLocalFontMessage(t("noLocalFonts"));
       return;
     }
 
     setAvailableFonts(fonts, arabicHint || state.currentFontFamily);
   } catch (error) {
     console.error(error);
-    showLocalFontMessage("تعذر فحص خطوط الجهاز");
+    showLocalFontMessage(t("localFontsFailed"));
   }
 }
 
@@ -1339,6 +2108,18 @@ function downloadBlob(blob, filename) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => {
+    return {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[char];
+  });
 }
 
 function downloadPngFile() {
@@ -1355,8 +2136,67 @@ function downloadPngFile() {
   }, "image/png");
 }
 
+function downloadSvgFile() {
+  if (!state.lastText) return;
+  const lines = state.lastText.split("\n");
+  const charWidth = 7.8;
+  const lineHeight = 13;
+  const width = Math.ceil(Math.max(1, ...lines.map((line) => line.length)) * charWidth + 40);
+  const height = Math.ceil(Math.max(1, lines.length) * lineHeight + 40);
+  const colors = getArtColors();
+  const fill = colors.colorMode === "gradient" ? 'url(#symbolGradient)' : escapeHtml(colors.artColor);
+  const stops = gradientStops(colors)
+    .map((stop) => `<stop offset="${Math.round(stop.position * 100)}%" stop-color="${escapeHtml(stop.color)}"/>`)
+    .join("");
+  const defs = colors.colorMode === "gradient"
+    ? `<defs><linearGradient id="symbolGradient" x1="0%" y1="0%" x2="${colors.gradientDirection === "down" ? "0%" : "100%"}" y2="${colors.gradientDirection === "right" ? "0%" : "100%"}">${stops}</linearGradient></defs>`
+    : "";
+  const textLines = lines
+    .map((line, index) => `<text x="20" y="${28 + index * lineHeight}">${escapeHtml(line)}</text>`)
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+${defs}
+<g fill="${fill}" font-family="Courier New, Menlo, monospace" font-size="11" font-weight="800" xml:space="preserve">
+${textLines}
+</g>
+</svg>`;
+  downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${state.lastFileBase}.svg`);
+}
+
+async function copyTextExport() {
+  if (!state.lastText) return;
+  try {
+    await navigator.clipboard.writeText(state.lastText);
+  } catch {
+    downloadBlob(new Blob([state.lastText], { type: "text/plain" }), `${state.lastFileBase}.txt`);
+  }
+}
+
+function downloadHtmlFile() {
+  if (!state.lastText) return;
+  const colors = getArtColors();
+  const color = escapeHtml(colors.artColor);
+  const textColorCss = colors.colorMode === "gradient"
+    ? `color: transparent; background: ${currentArtCssColor()}; -webkit-background-clip: text; background-clip: text;`
+    : `color: ${color};`;
+  const html = `<!doctype html>
+<html lang="${state.lang}" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(state.lastFileBase)}</title>
+  <style>
+    body { margin: 0; padding: 32px; background: transparent; }
+    pre { margin: 0; font: 800 11px/0.92 "Courier New", Menlo, monospace; white-space: pre; ${textColorCss} }
+  </style>
+</head>
+<body><pre>${escapeHtml(state.lastText)}</pre></body>
+</html>`;
+  downloadBlob(new Blob([html], { type: "text/html" }), `${state.lastFileBase}.html`);
+}
+
 function setAnimatedExportBusy(busy) {
-  if (isAnimated()) {
+  if (elements.downloadGif && isAnimated()) {
     elements.downloadGif.disabled = busy;
   }
 }
@@ -1365,7 +2205,7 @@ function renderAnimationFrame(canvas, timestamp, scale) {
   drawArtCanvas(canvas, state.lastArt, {
     scale,
     includeBackground: true,
-    includeGrid: elements.gridToggle.checked,
+      includeGrid: elements.gridToggle?.checked || false,
     animation: elements.animationSelect.value,
     timestamp,
   });
@@ -1403,42 +2243,133 @@ async function downloadGifFile() {
   }
 }
 
-function setMode(mode) {
+function setMode(mode, style = mode) {
   state.mode = mode;
+  state.style = style;
   elements.modeButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.mode === mode);
+    button.classList.toggle("is-active", (button.dataset.style || button.dataset.mode) === style);
   });
+  const activeButton = elements.modeButtons.find((button) => (button.dataset.style || button.dataset.mode) === style);
+  if (activeButton?.dataset.fillValue) {
+    elements.fillText.value = activeButton.dataset.fillValue;
+    elements.fillPreset.value = "custom";
+  }
   scheduleRender();
 }
 
-function setExportMenu(open) {
-  elements.exportMenu.classList.toggle("is-open", open);
-  elements.exportToggle.setAttribute("aria-expanded", String(open));
+function setColorMode(mode) {
+  state.colorMode = mode === "gradient" ? "gradient" : "solid";
+  updateColorPanels();
+  scheduleRender();
 }
 
-function toggleExportMenu() {
-  setExportMenu(!elements.exportMenu.classList.contains("is-open"));
+function setGradientDirection(direction) {
+  state.gradientDirection = ["down", "right", "diagonal", "radial"].includes(direction) ? direction : "down";
+  updateColorPanels();
+  scheduleRender();
+}
+
+function setGradientStopPosition(stop, value) {
+  const clamped = Math.max(0, Math.min(100, value));
+  if (stop === "from") {
+    state.gradientFromPosition = Math.min(clamped, state.gradientToPosition - 1);
+  } else {
+    state.gradientToPosition = Math.max(clamped, state.gradientFromPosition + 1);
+  }
+  updateGradientPreview();
+  scheduleRender();
+}
+
+function setGradientStopFromPointer(stop, clientX) {
+  if (!elements.gradientPreview) return;
+  const rect = elements.gradientPreview.getBoundingClientRect();
+  const raw = ((clientX - rect.left) / rect.width) * 100;
+  setGradientStopPosition(stop, raw);
+}
+
+function beginGradientStopDrag(event) {
+  const handle = event.target.closest("[data-gradient-stop]");
+  if (!handle) return;
+  state.gradientDraggingStop = handle.dataset.gradientStop;
+  handle.setPointerCapture?.(event.pointerId);
+  setGradientStopFromPointer(state.gradientDraggingStop, event.clientX);
+}
+
+function continueGradientStopDrag(event) {
+  if (!state.gradientDraggingStop) return;
+  setGradientStopFromPointer(state.gradientDraggingStop, event.clientX);
+}
+
+function endGradientStopDrag() {
+  state.gradientDraggingStop = null;
 }
 
 [
   elements.sourceText,
   elements.compositionSelect,
   elements.artColor,
+  elements.backgroundColor,
+  elements.gradientFrom,
+  elements.gradientTo,
   elements.inkRange,
   elements.animationSelect,
-  elements.gridToggle,
   elements.exportBackground,
   elements.fontWeight,
   elements.sizeRange,
   elements.detailRange,
   elements.thresholdRange,
-].forEach((control) => {
+].filter(Boolean).forEach((control) => {
   control.addEventListener("input", scheduleRender);
   control.addEventListener("change", scheduleRender);
 });
 
+[elements.artColor, elements.backgroundColor, elements.gradientFrom, elements.gradientTo].filter(Boolean).forEach((control) => {
+  control.addEventListener("input", () => {
+    syncColorSwatches("art");
+    syncColorSwatches("background");
+    updateGradientPreview();
+  });
+  control.addEventListener("change", () => {
+    syncColorSwatches("art");
+    syncColorSwatches("background");
+    updateGradientPreview();
+  });
+});
+
+elements.colorModeButtons?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-color-mode]");
+  if (!button) return;
+  setColorMode(button.dataset.colorMode);
+});
+
+elements.gradientDirectionButtons?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-gradient-direction]");
+  if (!button) return;
+  setGradientDirection(button.dataset.gradientDirection);
+});
+
+elements.gradientStopHandles.forEach((handle) => {
+  handle.addEventListener("pointerdown", beginGradientStopDrag);
+  handle.addEventListener("pointermove", continueGradientStopDrag);
+  handle.addEventListener("pointerup", endGradientStopDrag);
+  handle.addEventListener("pointercancel", endGradientStopDrag);
+});
+
+elements.colorSwatches.forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = button.dataset.colorTarget === "background" ? elements.backgroundColor : elements.artColor;
+    if (!input) return;
+    input.value = button.dataset.colorValue;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});
+
 elements.fillPreset.addEventListener("change", applyFillPreset);
 elements.fillText.addEventListener("input", handleCustomFillInput);
+elements.randomizeText.addEventListener("click", randomizeText);
+elements.accordionButtons.forEach((button) => {
+  button.addEventListener("click", () => toggleAccordion(button));
+});
 elements.sourceModeButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-source-mode]");
   if (button) setSourceMode(button.dataset.sourceMode);
@@ -1467,35 +2398,61 @@ elements.fontSourceButtons.addEventListener("click", (event) => {
   }
 });
 elements.fontSelect.addEventListener("change", () => setFontFamily(elements.fontSelect.value));
-elements.exportToggle.addEventListener("click", toggleExportMenu);
+elements.zoomOut.addEventListener("click", () => setCanvasZoom(state.canvasZoom - 0.1));
+elements.zoomIn.addEventListener("click", () => setCanvasZoom(state.canvasZoom + 0.1));
+elements.artboardMenuToggle.addEventListener("click", () => {
+  setArtboardMenu(!elements.artboardMenu.classList.contains("is-open"));
+});
+elements.artboardPresetButtons.forEach((button) => {
+  button.addEventListener("click", () => setArtboardPreset(button.dataset.artboardPreset));
+});
+elements.canvasStage.addEventListener("pointerdown", beginCanvasPan);
+elements.canvasStage.addEventListener("pointermove", continueCanvasPan);
+elements.canvasStage.addEventListener("pointerup", endCanvasPan);
+elements.canvasStage.addEventListener("pointercancel", endCanvasPan);
+elements.canvasStage.addEventListener("wheel", handleCanvasWheel, { passive: false });
+elements.sidebarToggle.addEventListener("click", toggleSidebar);
 elements.downloadPng.addEventListener("click", downloadPngFile);
-elements.downloadGif.addEventListener("click", () => {
-  downloadGifFile().catch((error) => {
+elements.downloadSvg.addEventListener("click", downloadSvgFile);
+elements.copyText.addEventListener("click", () => {
+  copyTextExport().catch((error) => {
     console.error(error);
   });
 });
-
-[elements.downloadPng, elements.downloadGif].forEach((button) => {
-  button.addEventListener("click", () => setExportMenu(false));
+if (elements.downloadHtml) {
+  elements.downloadHtml.addEventListener("click", downloadHtmlFile);
+}
+if (elements.downloadGif) {
+  elements.downloadGif.addEventListener("click", () => {
+    downloadGifFile().catch((error) => {
+      console.error(error);
+    });
+  });
+}
+elements.languageToggle.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-lang]");
+  if (button) applyLanguage(button.dataset.lang);
 });
 
 document.addEventListener("click", (event) => {
-  if (!elements.exportMenu.contains(event.target)) {
-    setExportMenu(false);
+  if (!elements.artboardMenu.contains(event.target)) {
+    setArtboardMenu(false);
   }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    setExportMenu(false);
+    setArtboardMenu(false);
     if (state.drawingExpanded) {
       setDrawingExpanded(false);
     }
   }
 });
 
+window.addEventListener("resize", fitCanvasToStage);
+
 elements.modeButtons.forEach((button) => {
-  button.addEventListener("click", () => setMode(button.dataset.mode));
+  button.addEventListener("click", () => setMode(button.dataset.mode, button.dataset.style || button.dataset.mode));
 });
 
 updateRangeLabels();
@@ -1503,12 +2460,19 @@ seedFontRegistry();
 renderFontOptions("");
 syncFontSourceButtons();
 updateExportOptions();
+updateColorPanels();
+syncColorSwatches("art");
+syncColorSwatches("background");
+updateColorCssVars();
 clearDrawingCanvas();
+setArtboardPreset("wide");
+applyLanguage(state.lang);
 scheduleRender();
 
 return {
   destroy() {
     stopAnimationLoop();
+    window.removeEventListener("resize", fitCanvasToStage);
   },
 };
 }
