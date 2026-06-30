@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import {
   Braces,
   CaseSensitive,
@@ -660,10 +661,13 @@ export default function App() {
   }, []);
 
   return (
-    <main className="app-shell">
-      <OutputPanel />
-      <ControlPanel />
-      <canvas id="maskCanvas" hidden />
-    </main>
+    <>
+      <main className="app-shell">
+        <OutputPanel />
+        <ControlPanel />
+        <canvas id="maskCanvas" hidden />
+      </main>
+      <Analytics />
+    </>
   );
 }
