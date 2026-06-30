@@ -1,4 +1,24 @@
 import { useEffect } from "react";
+import {
+  Braces,
+  CaseSensitive,
+  ChevronUp,
+  Dice5,
+  Download,
+  FileCode2,
+  FileImage,
+  FileText,
+  Film,
+  Grid3X3,
+  Minus,
+  Palette,
+  PanelRight,
+  Plus,
+  Ruler,
+  Type,
+  Upload,
+  Wand2,
+} from "lucide-react";
 import { initializeArabicAsciiApp } from "./lib/asciiApp.js";
 
 const defaultFill = "01IM:;/\\.,{}[]";
@@ -121,54 +141,112 @@ function SidebarIcon() {
   );
 }
 
+function SymbolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M8 8h.01M12 8h.01M16 8h.01" />
+      <path d="M7 13h10" />
+      <path d="M9 17h6" />
+    </svg>
+  );
+}
+
+function FontIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M5 7V5h14v2" />
+      <path d="M12 5v14" />
+      <path d="M9 19h6" />
+    </svg>
+  );
+}
+
+function ColorIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M12 4v16" />
+      <path d="M7 8h10" />
+      <path d="M6 16h12" />
+    </svg>
+  );
+}
+
+function SizeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M7 7h10v10H7z" />
+      <path d="M4 4h3v3M17 4h3v3M4 17v3h3M20 17v3h-3" />
+    </svg>
+  );
+}
+
+function MotionIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M5 12h5" />
+      <path d="m8 9 3 3-3 3" />
+      <path d="M14 7h5M14 12h5M14 17h5" />
+    </svg>
+  );
+}
+
 function OutputPanel() {
   return (
     <section className="output-panel" aria-label="معاينة فن الأسكي" data-i18n-attr="aria-label:outputPanel">
       <div className="canvas-shell" id="canvasShell">
         <div className="canvas-toolbar" aria-label="أدوات اللوحة" data-i18n-attr="aria-label:canvasTools">
-          <div className="canvas-toolbar-group">
-            <button className="canvas-icon-button" id="zoomOut" type="button" aria-label="تصغير" data-i18n-attr="aria-label:zoomOut">
-              <MinusIcon />
-            </button>
-            <output className="zoom-readout" id="zoomReadout">100%</output>
-            <button className="canvas-icon-button" id="zoomIn" type="button" aria-label="تكبير" data-i18n-attr="aria-label:zoomIn">
-              <PlusIcon />
-            </button>
-            <div className="artboard-menu" id="artboardMenu">
-              <button className="canvas-icon-button" id="artboardMenuToggle" type="button" aria-expanded="false" aria-haspopup="menu" aria-label="مقاسات اللوحة" data-i18n-attr="aria-label:artboardSizes">
-                <ArtboardIcon />
-              </button>
-              <div className="artboard-options" id="artboardOptions" role="menu" aria-label="مقاسات اللوحة" data-i18n-attr="aria-label:artboardSizes">
-                <button type="button" role="menuitem" data-artboard-preset="square" data-i18n="artboardSquare">مربع 1:1</button>
-                <button type="button" role="menuitem" data-artboard-preset="story" data-i18n="artboardStory">ستوري 9:16</button>
-                <button type="button" role="menuitem" data-artboard-preset="post" data-i18n="artboardPost">بوست 4:5</button>
-                <button type="button" role="menuitem" data-artboard-preset="wide" data-i18n="artboardWide">عرضي 16:9</button>
-                <button type="button" role="menuitem" data-artboard-preset="a4" data-i18n="artboardA4">A4 عمودي</button>
-                <button type="button" role="menuitem" data-artboard-preset="a4Landscape" data-i18n="artboardA4Landscape">A4 عرضي</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="canvas-toolbar-group canvas-toolbar-group--end">
-            <div className="language-toggle" id="languageToggle" aria-label="اختيار اللغة" data-i18n-attr="aria-label:language">
-              <button className="is-active" type="button" data-lang="ar">AR</button>
-              <button type="button" data-lang="en">EN</button>
-            </div>
+          <div className="language-toggle" id="languageToggle" aria-label="اختيار اللغة" data-i18n-attr="aria-label:language">
+            <button className="is-active" type="button" data-lang="ar">AR</button>
+            <button type="button" data-lang="en">EN</button>
           </div>
         </div>
 
         <div className="canvas-stage" id="canvasStage">
-          <div className="canvas-content" id="canvasContent">
-            <div className="artboard" id="artboard" data-artboard="wide">
-              <div className="preview-frame" id="previewFrame">
-                <canvas id="artCanvas" aria-label="معاينة فن الأسكي الناتج" data-i18n-attr="aria-label:artCanvas" />
-                <canvas id="drawingCanvas" className="drawing-canvas is-hidden" width="1800" height="980" aria-label="لوحة الرسم" data-i18n-attr="aria-label:drawingCanvas" />
-                <div className="drawing-stage-actions is-hidden" id="drawingStageActions">
-                  <button id="drawingResultToggle" type="button" data-i18n="showResult">عرض النتيجة</button>
-                  <button id="collapseDrawing" type="button" data-i18n="back">رجوع</button>
+          <div className="canvas-corner-tools" aria-label="أدوات اللوحة" data-i18n-attr="aria-label:canvasTools">
+            <div className="canvas-floating-controls canvas-floating-controls--zoom">
+              <button className="canvas-icon-button" id="zoomOut" type="button" aria-label="تصغير" data-i18n-attr="aria-label:zoomOut">
+                <Minus aria-hidden="true" />
+              </button>
+              <output className="zoom-readout" id="zoomReadout">100%</output>
+              <button className="canvas-icon-button" id="zoomIn" type="button" aria-label="تكبير" data-i18n-attr="aria-label:zoomIn">
+                <Plus aria-hidden="true" />
+              </button>
+            </div>
+            <div className="canvas-floating-controls canvas-floating-controls--size">
+              <div className="artboard-menu" id="artboardMenu">
+                <button className="artboard-size-button" id="artboardMenuToggle" type="button" aria-expanded="false" aria-haspopup="menu" aria-label="مقاسات اللوحة" data-i18n-attr="aria-label:artboardSizes">
+                  <Grid3X3 aria-hidden="true" />
+                  <output id="artboardPresetReadout" dir="ltr">16:9</output>
+                </button>
+                <div className="artboard-options" id="artboardOptions" role="menu" aria-label="مقاسات اللوحة" data-i18n-attr="aria-label:artboardSizes">
+                  <button type="button" role="menuitem" data-artboard-preset="square" data-i18n="artboardSquare">مربع 1:1</button>
+                  <button type="button" role="menuitem" data-artboard-preset="story" data-i18n="artboardStory">ستوري 9:16</button>
+                  <button type="button" role="menuitem" data-artboard-preset="post" data-i18n="artboardPost">بوست 4:5</button>
+                  <button type="button" role="menuitem" data-artboard-preset="wide" data-i18n="artboardWide">عرضي 16:9</button>
+                  <button type="button" role="menuitem" data-artboard-preset="a4" data-i18n="artboardA4">A4 عمودي</button>
+                  <button type="button" role="menuitem" data-artboard-preset="a4Landscape" data-i18n="artboardA4Landscape">A4 عرضي</button>
                 </div>
-                <pre id="textOutput" className="is-hidden" dir="ltr" aria-label="النص القابل للنسخ" data-i18n-attr="aria-label:textOutput" />
               </div>
+            </div>
+          </div>
+          <div className="canvas-content" id="canvasContent">
+            <div className="artboard-stack" id="artboardStack">
+              <div className="artboard-slot is-active" data-artboard-id="artboard-1" aria-label="لوحة العمل 1" data-i18n-attr="aria-label:artboardItem">
+                <div className="artboard" id="artboard" data-artboard="wide">
+                  <div className="preview-frame" id="previewFrame">
+                    <canvas id="artCanvas" aria-label="معاينة فن الأسكي الناتج" data-i18n-attr="aria-label:artCanvas" />
+                    <canvas id="drawingCanvas" className="drawing-canvas is-hidden" width="1800" height="980" aria-label="لوحة الرسم" data-i18n-attr="aria-label:drawingCanvas" />
+                    <div className="drawing-stage-actions is-hidden" id="drawingStageActions">
+                      <button id="drawingResultToggle" type="button" data-i18n="showResult">عرض النتيجة</button>
+                      <button id="collapseDrawing" type="button" data-i18n="back">رجوع</button>
+                    </div>
+                    <pre id="textOutput" className="is-hidden" dir="ltr" aria-label="النص القابل للنسخ" data-i18n-attr="aria-label:textOutput" />
+                  </div>
+                </div>
+              </div>
+              <button className="add-artboard-button" id="addArtboard" type="button" aria-label="إضافة لوحة عمل" data-i18n-attr="aria-label:addArtboard">
+                <Plus aria-hidden="true" />
+              </button>
             </div>
           </div>
         </div>
@@ -184,11 +262,11 @@ function OutputPanel() {
 
 function SourceSection() {
   return (
-    <section className="panel-section">
+    <section className="panel-section" data-mobile-panel="source">
       <div className="section-heading-row">
         <h2 data-i18n="source">النص</h2>
         <button className="random-button" id="randomizeText" type="button">
-          <DiceIcon />
+          <Dice5 aria-hidden="true" />
           <span data-i18n="random">عشوائي</span>
         </button>
       </div>
@@ -205,7 +283,7 @@ function SourceSection() {
 
       <div className="image-source-panel is-hidden" id="imageSourcePanel">
         <button className="icon-action source-upload-action" id="imageUploadTrigger" type="button">
-          <UploadIcon />
+          <Upload aria-hidden="true" />
           <span data-i18n="uploadImage">رفع صورة</span>
         </button>
         <input id="imageUpload" type="file" accept="image/*" />
@@ -228,7 +306,7 @@ function SourceSection() {
 
 function SymbolsSection() {
   return (
-    <section className="panel-section">
+    <section className="panel-section" data-mobile-panel="symbols">
       <h2 data-i18n="symbols">الأسلوب</h2>
 
       <label className="field hidden-control">
@@ -273,10 +351,10 @@ function SymbolsSection() {
 
 function FontSection() {
   return (
-    <section className="panel-section accordion-section">
+    <section className="panel-section accordion-section" data-mobile-panel="fonts">
       <button className="accordion-header" type="button" aria-expanded="false">
         <h2 data-i18n="fonts">الخطوط</h2>
-        <ChevronIcon />
+        <ChevronUp aria-hidden="true" />
       </button>
 
       <div className="accordion-content">
@@ -325,14 +403,14 @@ function FontSection() {
 }
 
 function ColorSection() {
-  const artSwatches = ["#111111", "#ee3b46", "#4a82a3", "#2f9e91", "#edc65f", "#10e6a7"];
-  const bgSwatches = ["#ffffff", "#111111", "#f8f0e3", "#211832", "#102a17", "#10111e"];
+  const artSwatches = ["#050505", "#333333", "#666666", "#999999", "#ffffff"];
+  const bgSwatches = ["#ffffff", "#f5f5f3", "#e7e7e3", "#cfcfca", "#050505"];
 
   return (
-    <section className="panel-section accordion-section">
+    <section className="panel-section accordion-section" data-mobile-panel="color">
       <button className="accordion-header" type="button" aria-expanded="false">
         <h2 data-i18n="color">اللون</h2>
-        <ChevronIcon />
+        <ChevronUp aria-hidden="true" />
       </button>
 
       <div className="accordion-content">
@@ -347,7 +425,7 @@ function ColorSection() {
             <div className="swatch-row">
               {artSwatches.map((color) => (
                 <button
-                  className={color === "#111111" ? "color-swatch is-active" : "color-swatch"}
+                  className={color === "#050505" ? "color-swatch is-active" : "color-swatch"}
                   key={color}
                   type="button"
                   style={{ "--swatch": color }}
@@ -357,7 +435,7 @@ function ColorSection() {
                 />
               ))}
               <label className="color-picker-swatch">
-                <input id="artColor" type="color" defaultValue="#111111" aria-label="لون الرموز" data-i18n-attr="aria-label:symbolColor" />
+                <input id="artColor" type="color" defaultValue="#050505" aria-label="لون الرموز" data-i18n-attr="aria-label:symbolColor" />
               </label>
             </div>
           </div>
@@ -373,11 +451,11 @@ function ColorSection() {
             <div className="gradient-stop-controls">
               <label>
                 <span data-i18n="gradientFrom">من</span>
-                <input id="gradientFrom" type="color" defaultValue="#9b51e0" />
+                <input id="gradientFrom" type="color" defaultValue="#050505" />
               </label>
               <label>
                 <span data-i18n="gradientTo">إلى</span>
-                <input id="gradientTo" type="color" defaultValue="#ff6a3d" />
+                <input id="gradientTo" type="color" defaultValue="#7a7a7a" />
               </label>
             </div>
           </div>
@@ -424,10 +502,10 @@ function ColorSection() {
 
 function SizeSection() {
   return (
-    <section className="panel-section accordion-section">
+    <section className="panel-section accordion-section" data-mobile-panel="size">
       <button className="accordion-header" type="button" aria-expanded="false">
         <h2 data-i18n="size">المقاسات</h2>
-        <ChevronIcon />
+        <ChevronUp aria-hidden="true" />
       </button>
 
       <div className="accordion-content">
@@ -452,10 +530,10 @@ function SizeSection() {
 
 function MotionSection() {
   return (
-    <section className="panel-section accordion-section">
+    <section className="panel-section accordion-section" data-mobile-panel="motion">
       <button className="accordion-header" type="button" aria-expanded="false">
         <h2 data-i18n="motionShape">الحركة والشكل</h2>
-        <ChevronIcon />
+        <ChevronUp aria-hidden="true" />
       </button>
 
       <div className="accordion-content">
@@ -489,6 +567,41 @@ function MotionSection() {
   );
 }
 
+const toolTabs = [
+  { panel: "source", label: "source", fallback: "النص", Icon: Type },
+  { panel: "symbols", label: "symbols", fallback: "الأسلوب", Icon: Braces },
+  { panel: "fonts", label: "fonts", fallback: "الخطوط", Icon: CaseSensitive },
+  { panel: "color", label: "color", fallback: "اللون", Icon: Palette },
+  { panel: "size", label: "size", fallback: "المقاسات", Icon: Ruler },
+  { panel: "motion", label: "animation", fallback: "الحركة", Icon: Wand2 },
+  { panel: "export", label: "export", fallback: "تصدير", Icon: Download },
+];
+
+function ToolTab({ tab }) {
+  const { panel, label, fallback, Icon } = tab;
+
+  return (
+    <button
+      className={panel === "source" ? "mobile-tab is-active" : "mobile-tab"}
+      type="button"
+      data-mobile-tab={panel}
+      aria-selected={panel === "source" ? "true" : "false"}
+      title={fallback}
+    >
+      <Icon aria-hidden="true" />
+      <span data-i18n={label}>{fallback}</span>
+    </button>
+  );
+}
+
+function MobileTabbar() {
+  return (
+    <nav className="mobile-tabbar" aria-label="أقسام الإعدادات" data-i18n-attr="aria-label:settings">
+      {toolTabs.map((tab) => <ToolTab key={tab.panel} tab={tab} />)}
+    </nav>
+  );
+}
+
 function ControlPanel() {
   return (
     <aside className="control-panel" aria-label="إعدادات التوليد" data-i18n-attr="aria-label:settings">
@@ -497,7 +610,7 @@ function ControlPanel() {
           <h1 data-i18n="appTitle">استوديو الأسكي العربي</h1>
         </div>
         <button className="canvas-icon-button sidebar-toggle" id="sidebarToggle" type="button" aria-expanded="true" aria-label="طي الشريط الجانبي" data-i18n-attr="aria-label:sidebarToggle">
-          <SidebarIcon />
+          <PanelRight aria-hidden="true" />
           <span data-i18n="sidebar">الشريط</span>
         </button>
       </div>
@@ -509,24 +622,26 @@ function ControlPanel() {
       <SizeSection />
       <MotionSection />
 
-      <div className="export-dock" aria-label="خيارات التصدير" data-i18n-attr="aria-label:exportOptions">
+      <div className="export-dock" data-mobile-panel="export" aria-label="خيارات التصدير" data-i18n-attr="aria-label:exportOptions">
         <button className="export-tile" id="downloadPng" type="button">
-          <PngIcon />
+          <FileImage aria-hidden="true" />
           <span>PNG</span>
         </button>
         <button className="export-tile" id="downloadSvg" type="button">
-          <SvgIcon />
+          <FileCode2 aria-hidden="true" />
           <span>SVG</span>
         </button>
         <button className="export-tile" id="copyText" type="button">
-          <TextIcon />
+          <FileText aria-hidden="true" />
           <span data-i18n="exportText">نص</span>
         </button>
         <button className="export-tile" id="downloadGif" type="button" disabled>
-          <GifIcon />
+          <Film aria-hidden="true" />
           <span>GIF</span>
         </button>
       </div>
+
+      <MobileTabbar />
 
       <input id="exportBackground" type="checkbox" hidden />
       <select id="exportScale" hidden defaultValue="4">

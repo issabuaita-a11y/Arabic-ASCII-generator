@@ -6,15 +6,20 @@ const elements = {
   canvasShell: document.querySelector("#canvasShell"),
   canvasStage: document.querySelector("#canvasStage"),
   canvasContent: document.querySelector("#canvasContent"),
+  artboardStack: document.querySelector("#artboardStack"),
   artboard: document.querySelector("#artboard"),
+  addArtboard: document.querySelector("#addArtboard"),
   artboardMenu: document.querySelector("#artboardMenu"),
   artboardMenuToggle: document.querySelector("#artboardMenuToggle"),
+  artboardPresetReadout: document.querySelector("#artboardPresetReadout"),
   artboardPresetButtons: Array.from(document.querySelectorAll("[data-artboard-preset]")),
   zoomOut: document.querySelector("#zoomOut"),
   zoomIn: document.querySelector("#zoomIn"),
   zoomReadout: document.querySelector("#zoomReadout"),
   charReadout: document.querySelector("#charReadout"),
   sidebarToggle: document.querySelector("#sidebarToggle"),
+  mobileTabButtons: Array.from(document.querySelectorAll("[data-mobile-tab]")),
+  mobilePanels: Array.from(document.querySelectorAll("[data-mobile-panel]")),
   sourceModeButtons: document.querySelector("#sourceModeButtons"),
   randomizeText: document.querySelector("#randomizeText"),
   accordionButtons: Array.from(document.querySelectorAll(".accordion-header")),
@@ -114,7 +119,12 @@ const state = {
   canvasDragPanX: 0,
   canvasDragPanY: 0,
   artboardPreset: "wide",
+  artboards: [],
+  activeArtboardId: "artboard-1",
+  artboardCounter: 1,
+  restoringArtboard: false,
   sidebarCollapsed: false,
+  mobilePanel: "source",
 };
 
 const DEFAULT_FILL = "01IM:;/\\.,{}[]";
@@ -141,6 +151,14 @@ const ARTBOARD_PRESETS = {
   a4: { width: 420, height: 594 },
   a4Landscape: { width: 594, height: 420 },
 };
+const ARTBOARD_READOUTS = {
+  square: "1:1",
+  story: "9:16",
+  post: "4:5",
+  wide: "16:9",
+  a4: "A4",
+  a4Landscape: "A4",
+};
 const ARTBOARD_ART_INSET = 0.12;
 let backgroundRemovalModulePromise = null;
 let gifEncoderModulePromise = null;
@@ -159,6 +177,8 @@ const UI_TEXT = {
     artboardWide: "عرضي 16:9",
     artboardA4: "A4 عمودي",
     artboardA4Landscape: "A4 عرضي",
+    addArtboard: "إضافة لوحة عمل",
+    artboardItem: "لوحة عمل",
     sidebar: "الشريط",
     sidebarToggle: "طي الشريط الجانبي",
     export: "تصدير",
@@ -270,6 +290,8 @@ const UI_TEXT = {
     artboardWide: "Landscape 16:9",
     artboardA4: "A4 portrait",
     artboardA4Landscape: "A4 landscape",
+    addArtboard: "Add artboard",
+    artboardItem: "Artboard",
     sidebar: "Sidebar",
     sidebarToggle: "Collapse sidebar",
     export: "Export",
@@ -453,6 +475,7 @@ function applyLanguage(lang) {
   }
 
   syncDrawingView();
+  renderArtboardSlots();
 }
 
 function updateRangeLabels() {
@@ -476,6 +499,228 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function activeArtboard() {
+  return state.artboards.find((board) => board.id === state.activeArtboardId) || state.artboards[0] || null;
+}
+
+function readArtboardControls() {
+  return {
+    sourceMode: state.sourceMode,
+    sourceText: elements.sourceText?.value ?? "حب",
+    fillText: elements.fillText?.value || DEFAULT_FILL,
+    fillPreset: elements.fillPreset?.value || "custom",
+    fontSource: state.fontSource,
+    fontFamily: state.currentFontFamily || elements.fontSelect?.value || "Geeza Pro",
+    fontWeight: elements.fontWeight?.value || "400",
+    composition: elements.compositionSelect?.value || "normal",
+    mode: state.mode,
+    style: state.style,
+    colorMode: state.colorMode,
+    artColor: elements.artColor?.value || "#050505",
+    backgroundColor: elements.backgroundColor?.value || PREVIEW_BACKGROUND,
+    gradientFrom: elements.gradientFrom?.value || "#050505",
+    gradientTo: elements.gradientTo?.value || "#7a7a7a",
+    gradientDirection: state.gradientDirection,
+    gradientFromPosition: state.gradientFromPosition,
+    gradientToPosition: state.gradientToPosition,
+    ink: elements.inkRange?.value || "3",
+    animation: elements.animationSelect?.value || "none",
+    size: elements.sizeRange?.value || "360",
+    detail: elements.detailRange?.value || "104",
+    threshold: elements.thresholdRange?.value || "18",
+    exportBackground: Boolean(elements.exportBackground?.checked),
+    artboardPreset: state.artboardPreset,
+    sourceImage: state.sourceImage,
+    sourceImageName: state.sourceImageName,
+    drawingHasInk: state.drawingHasInk,
+  };
+}
+
+function saveActiveArtboard(options = {}) {
+  const board = activeArtboard();
+  if (!board) return;
+  const controls = readArtboardControls();
+
+  board.controls = controls;
+  board.lastArt = controls.sourceMode === "text" && !controls.sourceText.trim() ? null : state.lastArt;
+  board.lastText = controls.sourceMode === "text" && !controls.sourceText.trim() ? "" : state.lastText;
+  board.lastFileBase = controls.sourceMode === "text" && !controls.sourceText.trim() ? "blank-artboard" : state.lastFileBase;
+
+  if (options.capturePreview && elements.artCanvas?.width && elements.artCanvas?.height) {
+    if (controls.sourceMode === "text" && !controls.sourceText.trim()) {
+      board.previewDataUrl = "";
+      return;
+    }
+    try {
+      board.previewDataUrl = elements.artCanvas.toDataURL("image/png");
+    } catch (error) {
+      board.previewDataUrl = "";
+    }
+  }
+}
+
+function syncModeButtons() {
+  elements.modeButtons.forEach((button) => {
+    button.classList.toggle("is-active", (button.dataset.style || button.dataset.mode) === state.style);
+  });
+}
+
+function syncSourceModeUi() {
+  elements.sourceModeButtons.querySelectorAll("[data-source-mode]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.sourceMode === state.sourceMode);
+  });
+  elements.textSourceField.classList.toggle("is-hidden", state.sourceMode !== "text");
+  elements.imageSourcePanel.classList.toggle("is-hidden", state.sourceMode !== "image");
+  elements.drawingSourcePanel.classList.toggle("is-hidden", state.sourceMode !== "drawing");
+  syncDrawingView();
+}
+
+function applyArtboardSlotSize(node, presetName) {
+  const preset = ARTBOARD_PRESETS[presetName] || ARTBOARD_PRESETS.wide;
+  node.style.setProperty("--artboard-width", `${preset.width}px`);
+  node.style.setProperty("--artboard-height", `${preset.height}px`);
+}
+
+function makeInactiveArtboardPreview(board) {
+  if (board.previewDataUrl) {
+    const image = document.createElement("img");
+    image.className = "artboard-snapshot";
+    image.alt = "";
+    image.draggable = false;
+    image.src = board.previewDataUrl;
+    applyArtboardSlotSize(image, board.controls?.artboardPreset || "wide");
+    return image;
+  }
+
+  const placeholder = document.createElement("div");
+  placeholder.className = "artboard-snapshot artboard-snapshot--blank";
+  applyArtboardSlotSize(placeholder, board.controls?.artboardPreset || "wide");
+  return placeholder;
+}
+
+function renderArtboardSlots() {
+  if (!elements.artboardStack || !elements.artboard || !elements.addArtboard) return;
+  const liveArtboard = elements.artboard;
+  elements.artboardStack.textContent = "";
+
+  state.artboards.forEach((board, index) => {
+    const slot = document.createElement("div");
+    slot.className = "artboard-slot";
+    slot.dataset.artboardId = board.id;
+    slot.tabIndex = 0;
+    slot.setAttribute("role", "button");
+    slot.setAttribute("aria-label", `${t("artboardItem")} ${index + 1}`);
+    slot.classList.toggle("is-active", board.id === state.activeArtboardId);
+    applyArtboardSlotSize(slot, board.controls?.artboardPreset || "wide");
+
+    if (board.id === state.activeArtboardId) {
+      slot.append(liveArtboard);
+    } else {
+      slot.append(makeInactiveArtboardPreview(board));
+    }
+
+    elements.artboardStack.append(slot);
+  });
+
+  elements.artboardStack.append(elements.addArtboard);
+}
+
+function restoreArtboardControls(board) {
+  if (!board?.controls) return;
+  const controls = board.controls;
+  state.restoringArtboard = true;
+  state.sourceMode = controls.sourceMode || "text";
+  state.sourceImage = controls.sourceImage || null;
+  state.sourceImageName = controls.sourceImageName || "";
+  state.drawingHasInk = Boolean(controls.drawingHasInk);
+  state.fontSource = controls.fontSource || state.fontSource;
+  state.currentFontFamily = controls.fontFamily || state.currentFontFamily;
+  state.mode = controls.mode || "code";
+  state.style = controls.style || state.mode;
+  state.colorMode = controls.colorMode === "gradient" ? "gradient" : "solid";
+  state.gradientDirection = controls.gradientDirection || "down";
+  state.gradientFromPosition = Number(controls.gradientFromPosition ?? 0);
+  state.gradientToPosition = Number(controls.gradientToPosition ?? 100);
+  state.lastArt = board.lastArt || null;
+  state.lastText = board.lastText || "";
+  state.lastFileBase = board.lastFileBase || "arabic-ascii";
+
+  elements.sourceText.value = Object.prototype.hasOwnProperty.call(controls, "sourceText") ? controls.sourceText : "حب";
+  elements.fillText.value = controls.fillText || DEFAULT_FILL;
+  elements.fillPreset.value = controls.fillPreset || "custom";
+  elements.compositionSelect.value = controls.composition || "normal";
+  elements.artColor.value = controls.artColor || "#050505";
+  elements.backgroundColor.value = controls.backgroundColor || PREVIEW_BACKGROUND;
+  elements.gradientFrom.value = controls.gradientFrom || "#050505";
+  elements.gradientTo.value = controls.gradientTo || "#7a7a7a";
+  elements.inkRange.value = controls.ink || "3";
+  elements.animationSelect.value = controls.animation || "none";
+  elements.sizeRange.value = controls.size || "360";
+  elements.detailRange.value = controls.detail || "104";
+  elements.thresholdRange.value = controls.threshold || "18";
+  elements.exportBackground.checked = Boolean(controls.exportBackground);
+  elements.fontSelect.value = state.currentFontFamily;
+  renderWeightOptions();
+  elements.fontWeight.value = controls.fontWeight || elements.fontWeight.value;
+
+  syncSourceModeUi();
+  syncModeButtons();
+  updateColorPanels();
+  syncColorSwatches("art");
+  syncColorSwatches("background");
+  updateRangeLabels();
+  setArtboardPreset(controls.artboardPreset || "wide");
+  state.restoringArtboard = false;
+  scheduleRender();
+}
+
+function selectArtboard(id) {
+  if (id === state.activeArtboardId || !state.artboards.some((board) => board.id === id)) return;
+  saveActiveArtboard({ capturePreview: true });
+  state.activeArtboardId = id;
+  renderArtboardSlots();
+  restoreArtboardControls(activeArtboard());
+}
+
+function addArtboard() {
+  saveActiveArtboard({ capturePreview: true });
+  state.artboardCounter += 1;
+  const id = `artboard-${state.artboardCounter}`;
+  const controls = {
+    ...readArtboardControls(),
+    sourceMode: "text",
+    sourceText: "حب",
+    sourceImage: null,
+    sourceImageName: "",
+    drawingHasInk: false,
+  };
+  state.artboards.push({
+    id,
+    controls,
+    lastArt: null,
+    lastText: "",
+    lastFileBase: "arabic-ascii",
+    previewDataUrl: "",
+  });
+  state.activeArtboardId = id;
+  renderArtboardSlots();
+  restoreArtboardControls(activeArtboard());
+}
+
+function initializeArtboards() {
+  state.artboards = [{
+    id: "artboard-1",
+    controls: readArtboardControls(),
+    lastArt: null,
+    lastText: "",
+    lastFileBase: "arabic-ascii",
+    previewDataUrl: "",
+  }];
+  state.activeArtboardId = "artboard-1";
+  state.artboardCounter = 1;
+  renderArtboardSlots();
+}
+
 function applyCanvasTransform() {
   if (!elements.canvasContent) return;
   elements.canvasContent.style.setProperty("--canvas-pan-x", `${state.canvasPanX}px`);
@@ -495,10 +740,31 @@ function fitCanvasToStage() {
   if (!elements.canvasStage || !elements.artboard) return;
   const stageRect = elements.canvasStage.getBoundingClientRect();
   const preset = ARTBOARD_PRESETS[state.artboardPreset] || ARTBOARD_PRESETS.wide;
-  const zoom = Math.min((stageRect.width - 96) / preset.width, (stageRect.height - 96) / preset.height, 1.4);
+  const fitWidth = state.artboards.length > 1 && elements.artboardStack?.offsetWidth
+    ? elements.artboardStack.offsetWidth
+    : preset.width;
+  const fitHeight = state.artboards.length > 1 && elements.artboardStack?.offsetHeight
+    ? elements.artboardStack.offsetHeight
+    : preset.height;
+  const zoom = Math.min((stageRect.width - 96) / fitWidth, (stageRect.height - 96) / fitHeight, 1.4);
   state.canvasPanX = 0;
   state.canvasPanY = 0;
   setCanvasZoom(clamp(zoom, 0.35, 1.4));
+}
+
+function centerActiveArtboardInStage() {
+  if (!elements.canvasStage || !elements.artboardStack) return;
+  if (state.artboards.length > 1) return;
+  const slot = elements.artboardStack.querySelector(`[data-artboard-id="${state.activeArtboardId}"]`);
+  if (!slot) return;
+  const stageRect = elements.canvasStage.getBoundingClientRect();
+  const slotRect = slot.getBoundingClientRect();
+  const zoom = Math.max(0.1, state.canvasZoom || 1);
+  const deltaX = (stageRect.left + stageRect.width / 2) - (slotRect.left + slotRect.width / 2);
+  const deltaY = (stageRect.top + stageRect.height / 2) - (slotRect.top + slotRect.height / 2);
+  state.canvasPanX += deltaX / zoom;
+  state.canvasPanY += deltaY / zoom;
+  applyCanvasTransform();
 }
 
 function setArtboardMenu(open) {
@@ -513,18 +779,25 @@ function setArtboardPreset(presetName) {
   elements.artboard.style.setProperty("--artboard-width", `${preset.width}px`);
   elements.artboard.style.setProperty("--artboard-height", `${preset.height}px`);
   elements.artboard.dataset.artboard = state.artboardPreset;
+  if (elements.artboardPresetReadout) {
+    elements.artboardPresetReadout.textContent = ARTBOARD_READOUTS[state.artboardPreset] || state.artboardPreset;
+  }
   elements.artboardPresetButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.artboardPreset === state.artboardPreset);
   });
   setArtboardMenu(false);
   fitCanvasToStage();
+  window.requestAnimationFrame(centerActiveArtboardInStage);
+  if (!state.restoringArtboard) {
+    saveActiveArtboard();
+  }
   if (state.lastArt) {
     drawPreview(state.lastArt, 0);
   }
 }
 
 function beginCanvasPan(event) {
-  if (event.button !== 0 || event.target.closest("button, input, select, textarea, .preview-frame")) return;
+  if (event.button !== 0 || event.target.closest("button, input, select, textarea, .preview-frame, .artboard-slot")) return;
   event.preventDefault();
   state.canvasPointerId = event.pointerId;
   state.canvasDragStartX = event.clientX;
@@ -557,7 +830,7 @@ function handleCanvasWheel(event) {
   event.preventDefault();
   if (event.ctrlKey || event.metaKey || Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
     const direction = event.deltaY > 0 ? -1 : 1;
-    setCanvasZoom(state.canvasZoom + direction * 0.08);
+    setCanvasZoom(state.canvasZoom + direction * 0.04);
     return;
   }
   state.canvasPanX -= event.deltaX;
@@ -572,7 +845,23 @@ function toggleSidebar() {
   window.requestAnimationFrame(fitCanvasToStage);
 }
 
+function setMobilePanel(panelName) {
+  state.mobilePanel = panelName || null;
+  elements.mobileTabButtons.forEach((button) => {
+    const isActive = button.dataset.mobileTab === state.mobilePanel;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  elements.mobilePanels.forEach((panel) => {
+    panel.classList.toggle("is-mobile-active", panel.dataset.mobilePanel === state.mobilePanel);
+  });
+  window.requestAnimationFrame(fitCanvasToStage);
+}
+
 function scheduleRender() {
+  if (!state.restoringArtboard) {
+    saveActiveArtboard();
+  }
   const renderId = ++state.renderId;
   window.requestAnimationFrame(() => {
     if (renderId === state.renderId) {
@@ -672,17 +961,11 @@ function scrollSectionIntoPanel(section) {
 
 function setSourceMode(mode) {
   state.sourceMode = mode;
-  elements.sourceModeButtons.querySelectorAll("[data-source-mode]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.sourceMode === mode);
-  });
-  elements.textSourceField.classList.toggle("is-hidden", mode !== "text");
-  elements.imageSourcePanel.classList.toggle("is-hidden", mode !== "image");
-  elements.drawingSourcePanel.classList.toggle("is-hidden", mode !== "drawing");
   if (mode !== "drawing") {
     setDrawingExpanded(false);
     setDrawingResultView(false);
   }
-  syncDrawingView();
+  syncSourceModeUi();
   scheduleRender();
 }
 
@@ -744,7 +1027,7 @@ function beginDrawing(event) {
   ctx.moveTo(point.x, point.y);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = "#111111";
+  ctx.strokeStyle = "#050505";
   ctx.lineWidth = Number(elements.drawingBrush.value) || 18;
   ctx.lineTo(point.x + 0.01, point.y + 0.01);
   ctx.stroke();
@@ -1288,10 +1571,10 @@ function buildTextArt(imageData, bounds, text, filler) {
 }
 
 function getArtColors() {
-  const artColor = elements.artColor?.value || "#111111";
+  const artColor = elements.artColor?.value || "#050505";
   const bgColor = elements.backgroundColor?.value || PREVIEW_BACKGROUND;
-  const gradientFrom = elements.gradientFrom?.value || "#9b51e0";
-  const gradientTo = elements.gradientTo?.value || "#ff6a3d";
+  const gradientFrom = elements.gradientFrom?.value || "#050505";
+  const gradientTo = elements.gradientTo?.value || "#7a7a7a";
   const fromPosition = Math.max(0, Math.min(100, state.gradientFromPosition));
   const toPosition = Math.max(0, Math.min(100, state.gradientToPosition));
   return {
@@ -1986,7 +2269,7 @@ async function renderArt() {
   stopAnimationLoop();
   updateRangeLabels();
   updateAnimation();
-  const rawText = elements.sourceText.value.trim() || "حب";
+  const rawText = elements.sourceText.value.trim();
   const lines = rawText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const filler = elements.fillText.value.trim() || DEFAULT_FILL;
   const family = state.currentFontFamily || elements.fontSelect.value || "Geeza Pro";
@@ -2020,8 +2303,21 @@ async function renderArt() {
     imageData = drawDrawingMask();
     fileBaseSource = "drawing-ascii";
   } else {
+    if (!rawText) {
+      state.lastArt = null;
+      state.lastText = "";
+      state.lastFileBase = "blank-artboard";
+      elements.textOutput.textContent = "";
+      if (elements.charReadout) {
+        elements.charReadout.textContent = "0 × 0 chars";
+      }
+      const ctx = elements.artCanvas.getContext("2d");
+      ctx.clearRect(0, 0, elements.artCanvas.width, elements.artCanvas.height);
+      saveActiveArtboard({ capturePreview: true });
+      return;
+    }
     await loadSelectedFont(requestedSize);
-    imageData = drawMask(lines.length ? lines : ["حب"], family, weight, requestedSize);
+    imageData = drawMask(lines, family, weight, requestedSize);
   }
 
   const bounds = findInkBounds(imageData);
@@ -2058,6 +2354,7 @@ async function renderArt() {
     Math.max(Number(elements.fontWeight.value || 800), Number(elements.inkRange.value || 3) >= 3 ? 800 : 700)
   );
   startAnimationLoop();
+  saveActiveArtboard();
 }
 
 async function scanLocalFonts() {
@@ -2246,9 +2543,7 @@ async function downloadGifFile() {
 function setMode(mode, style = mode) {
   state.mode = mode;
   state.style = style;
-  elements.modeButtons.forEach((button) => {
-    button.classList.toggle("is-active", (button.dataset.style || button.dataset.mode) === style);
-  });
+  syncModeButtons();
   const activeButton = elements.modeButtons.find((button) => (button.dataset.style || button.dataset.mode) === style);
   if (activeButton?.dataset.fillValue) {
     elements.fillText.value = activeButton.dataset.fillValue;
@@ -2398,13 +2693,26 @@ elements.fontSourceButtons.addEventListener("click", (event) => {
   }
 });
 elements.fontSelect.addEventListener("change", () => setFontFamily(elements.fontSelect.value));
-elements.zoomOut.addEventListener("click", () => setCanvasZoom(state.canvasZoom - 0.1));
-elements.zoomIn.addEventListener("click", () => setCanvasZoom(state.canvasZoom + 0.1));
+elements.zoomOut.addEventListener("click", () => setCanvasZoom(state.canvasZoom - 0.05));
+elements.zoomIn.addEventListener("click", () => setCanvasZoom(state.canvasZoom + 0.05));
 elements.artboardMenuToggle.addEventListener("click", () => {
   setArtboardMenu(!elements.artboardMenu.classList.contains("is-open"));
 });
 elements.artboardPresetButtons.forEach((button) => {
   button.addEventListener("click", () => setArtboardPreset(button.dataset.artboardPreset));
+});
+elements.addArtboard?.addEventListener("click", addArtboard);
+elements.artboardStack?.addEventListener("click", (event) => {
+  const slot = event.target.closest(".artboard-slot");
+  if (!slot) return;
+  selectArtboard(slot.dataset.artboardId);
+});
+elements.artboardStack?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const slot = event.target.closest(".artboard-slot");
+  if (!slot) return;
+  event.preventDefault();
+  selectArtboard(slot.dataset.artboardId);
 });
 elements.canvasStage.addEventListener("pointerdown", beginCanvasPan);
 elements.canvasStage.addEventListener("pointermove", continueCanvasPan);
@@ -2412,6 +2720,11 @@ elements.canvasStage.addEventListener("pointerup", endCanvasPan);
 elements.canvasStage.addEventListener("pointercancel", endCanvasPan);
 elements.canvasStage.addEventListener("wheel", handleCanvasWheel, { passive: false });
 elements.sidebarToggle.addEventListener("click", toggleSidebar);
+elements.mobileTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setMobilePanel(button.dataset.mobileTab === state.mobilePanel ? null : button.dataset.mobileTab);
+  });
+});
 elements.downloadPng.addEventListener("click", downloadPngFile);
 elements.downloadSvg.addEventListener("click", downloadSvgFile);
 elements.copyText.addEventListener("click", () => {
@@ -2467,6 +2780,8 @@ updateColorCssVars();
 clearDrawingCanvas();
 setArtboardPreset("wide");
 applyLanguage(state.lang);
+setMobilePanel(state.mobilePanel);
+initializeArtboards();
 scheduleRender();
 
 return {
